@@ -1,0 +1,35 @@
+[
+  {
+    "nodes" : [
+      {
+        "nodes" : [
+
+        ],
+        "frame" : "{{0, 18}, {400, 29}}",
+        "class" : "SegmentedControl",
+        "attributes" : {
+          "action" : "selPageAct",
+          "flex" : "LR",
+          "segments" : "Settings|Results|Graph",
+          "frame" : "{{212, 221}, {120, 29}}",
+          "uuid" : "CE73551E-E943-4E30-BF7C-062B0C20922C",
+          "class" : "SegmentedControl",
+          "name" : "selPage"
+        },
+        "selected" : true
+      }
+    ],
+    "frame" : "{{0, 0}, {400, 500}}",
+    "class" : "View",
+    "attributes" : {
+      "flex" : "",
+      "enabled" : true,
+      "tint_color" : "RGBA(0.000000,0.478000,1.000000,1.000000)",
+      "custom_class" : "vwMain",
+      "border_color" : "RGBA(0.000000,0.000000,0.000000,1.000000)",
+      "background_color" : "RGBA(1.000000,1.000000,1.000000,1.000000)",
+      "name" : ""
+    },
+    "selected" : false
+  }
+]

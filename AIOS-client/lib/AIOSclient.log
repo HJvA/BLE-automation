@@ -1,0 +1,81 @@
+lod :16
+### ble Scanning 7 peripherals ###
+Waiting for callbacks state=5
+testing peripheral: Eve Energy state 0 (57C37815-F5D9-4E00-93E3-E290B2AD00E6) isin:0
+testing peripheral: Eve Energy state 0 (57C37815-F5D9-4E00-93E3-E290B2AD00E6) isin:0
+testing peripheral: AIOS fshome state 0 (E00A11F1-3EAA-D8F2-1F5A-FD7D760336EE) isin:19
+connecting AIOS fshome
+testing peripheral: Eve Energy state 0 (45849792-4BA5-A753-A4C3-504BBE28A43B) isin:0
+testing peripheral: Eve Energy state 0 (45849792-4BA5-A753-A4C3-504BBE28A43B) isin:0
+testing peripheral: hj xFony state 0 (B7FC9DDA-D95A-CC46-1F7F-5B074617228F) isin:0
+testing peripheral: Mooshimeter V.1 state 0 (BC31FB55-B48B-4959-B491-589424C26173) isin:0
+testing peripheral: Mooshimeter V.1 state 0 (BC31FB55-B48B-4959-B491-589424C26173) isin:0
+*** Connected: AIOS fshome (E00A11F1-3EAA-D8F2-1F5A-FD7D760336EE)
+testing peripheral: Eve Degree state 0 (406B7217-8FD2-D7EC-CD6D-F30CE3F9C917) isin:0
+testing peripheral: Eve Degree state 0 (406B7217-8FD2-D7EC-CD6D-F30CE3F9C917) isin:0
+found 4 services for AIOS fshome (E00A11F1-3EAA-D8F2-1F5A-FD7D760336EE) busy:7
+discovering characteristics n:7 for AIOS fshome
+3 characteristics for serv:1815 (prim:True)
+fnd:AIOS fshome with s:1815 c:2A56
+++ charist 10 2A56 (notif:0)-->Notify,Read,Write no response
+fnd:AIOS fshome with s:1815 c:2A58
+++ charist 11 2A58 (notif:0)-->Notify,Read
+fnd:AIOS fshome with s:1815 c:2A58
+++ charist 12 2A58 (notif:0)-->Notify,Read
+4 characteristics for serv:6C2FE8E1-2498-420E-BAB4-81823E7B0C03 (prim:True)
+fnd:AIOS fshome with s:6C2FE8E1-2498-420E-BAB4-81823E7B0C03 c:2A6E
+++ charist 0 2A6E (notif:0)-->Notify,Read
+fnd:AIOS fshome with s:6C2FE8E1-2498-420E-BAB4-81823E7B0C03 c:2A6F
+++ charist 1 2A6F (notif:0)-->Notify,Read
+fnd:AIOS fshome with s:6C2FE8E1-2498-420E-BAB4-81823E7B0C03 c:6C2FE8E1-2498-420E-BAB4-81823E7B7397
+++ charist 2 6C2FE8E1-2498-420E-BAB4-81823E7B7397 (notif:0)-->Notify,Read
+fnd:AIOS fshome with s:6C2FE8E1-2498-420E-BAB4-81823E7B0C03 c:6C2FE8E1-2498-420E-BAB4-81823E7B7398
+++ charist 3 6C2FE8E1-2498-420E-BAB4-81823E7B7398 (notif:0)-->Notify,Read
+1 characteristics for serv:180F (prim:True)
+nothing to discover anymore for act peripheral
+testing peripheral: Eve Room state 0 (647D9250-BC28-9A5B-5DF6-456EB83719B3) isin:0
+testing peripheral: Eve Room state 0 (647D9250-BC28-9A5B-5DF6-456EB83719B3) isin:0
+testing peripheral: [TV] Samsung 7 Series (55) state 0 (AA89EB6B-A085-F2EA-520B-8062B334CCC7) isin:0
+5 characteristics for serv:180A (prim:True)
+nothing to discover anymore for act peripheral
+found 7 characteristics
+setup response for AIOS fshome with prop:Notify,Read notifying:0
+setup response for AIOS fshome with prop:Notify,Read notifying:0
+setup response for AIOS fshome with prop:Notify,Read notifying:0
+setup response for AIOS fshome with prop:Notify,Read notifying:0
+setup response for AIOS fshome with prop:Notify,Read,Write no response notifying:0
+setup response for AIOS fshome with prop:Notify,Read notifying:0
+setup response for AIOS fshome with prop:Notify,Read notifying:0
+setup response for AIOS fshome with prop:Notify,Read,Write no response notifying:0
+setup response for AIOS fshome with prop:Notify,Read notifying:0
+setup response for AIOS fshome with prop:Notify,Read notifying:0
+setup response for AIOS fshome with prop:Notify,Read,Write no response notifying:0
+setup response for AIOS fshome with prop:Notify,Read notifying:0
+setup response for AIOS fshome with prop:Notify,Read notifying:0
+setup response for AIOS fshome with prop:Notify,Read,Write no response notifying:0
+setup response for AIOS fshome with prop:Notify,Read notifying:0
+setup response for AIOS fshome with prop:Notify,Read notifying:0
+setup response for AIOS fshome with prop:Notify,Read,Write no response notifying:0
+setup response for AIOS fshome with prop:Notify,Read notifying:0
+setup response for AIOS fshome with prop:Notify,Read notifying:0
+setup response for AIOS fshome with prop:Notify,Read,Write no response notifying:0
+dig receive:ff.ff.ff.ff.37.ff.ff.ff
+dig receive:ff.ff.ff.ff.37.ff.ff.ff
+receiving temperature = b'\xe9\x08' (2281)
+receiving humidity = b'\xe0\x15' (5600)
+receiving eCO2 = b'\xc3\x01' (451)
+receiving TVOC = b'\x07\x00' (7)
+receiving analog A0 = b'Z\xb4' (-19366)
+receiving analog A0 = b's2' (12915)
+dig receive:ff.ff.ff.ff.37.ff.ff.ff
+receiving temperature = b'\xe6\x08' (2278)
+receiving humidity = b'\xe0\x15' (5600)
+receiving eCO2 = b'\xc3\x01' (451)
+receiving TVOC = b'\x07\x00' (7)
+receiving analog A0 = b'\x8a\xaf' (-20598)
+receiving analog A0 = b'\x003' (13056)
+writing val to c:2A56 val:ffffffff77ffffff
+dig receive:ff.ff.ff.ff.77.ff.ff.ff
+receiving analog A0 = b'\x003' (13056)
+writing val to c:2A56 val:ffffffff37ffffff
+bye
