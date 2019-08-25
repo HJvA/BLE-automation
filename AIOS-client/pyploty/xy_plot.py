@@ -11,36 +11,38 @@ logger = tls.get_logger(__file__)
 
 class xy_graph(object):
 	def __init__(self, context, hold=True, grid=True):
-		''' context= canvas_context or uiView_context object having world set to a drawing area  '''
-		self.context = context
-		#self.outerbox = world_frame
+		''' context= canvas_context or uiView_context object having world set to a drawing area  
+			each yaxis side may have differen context '''
+		if type(context) is dict:
+			self.context = context
+		else:
+			self.context = {0:context} # graph to have different context for left and right yaxis
 		self.hold=hold
 		self.grid=grid
 				
 		self.axis_color = (0.40, 0.40, 0.40)
-		
-		# Initialize non-public attributes
 		self.datasets = []
-		self.set_bounds(*context.user.frame())
+		for id,ctx in self.context.items():
+			self.set_bounds(*ctx.user.frame(), ctxId=id)
 		
-	def set_bounds(self, xmin,ymin, xsize, ysize):		
+	def set_bounds(self, xmin,ymin, xsize, ysize, ctxId=0):		
 		'''
 		Set x- and y-axis user coord limits.
-		
 		Will also recalculate tick positions.
 		'''
 		if xsize==0 or ysize==0 or math.isinf(xmin)  or math.isinf(ymin):
 			return 
-		wrld_frame = self.context.world
+		wrld_frame = self.context[ctxId].world
 		user_frame = plottls.rect_area(xmin,ymin, xsize, ysize)
 		logger.info('scaling graph wrld:%s user:%s' % (wrld_frame.frame(),user_frame.frame()))
 		#self.innerbox = plottls.canvas_context(wrld_frame, user_frame)
-		self.context.user.set_origin(xmin,ymin)
-		self.context.user.set_size(xsize, ysize)
+		self.context[ctxId].user.set_origin(xmin,ymin)
+		self.context[ctxId].user.set_size(xsize, ysize)
 		xlim = (xmin, xmin+xsize)
 		ylim = (ymin, ymin+ysize)
-		self.xticks = _calc_ticks(xlim)
-		self.yticks = _calc_ticks(ylim)
+		if ctxId==0:
+			self.xticks = _calc_ticks(xlim)
+			#self.yticks = _calc_ticks(ylim,ctxId)
 		self.rescaling=True
 
 	def adjust_margins(self):	
@@ -54,7 +56,7 @@ class xy_graph(object):
 		ws = []
 		hs = []
 		for t in self.xticks:
-			_, w, h = self.get_ticklabel(t)
+			_, w, h = self.get_ticklabel(t,0)
 			ws.append(w)
 			hs.append(h)
 		xmarg[0] = ws[1]/2 
@@ -68,8 +70,9 @@ class xy_graph(object):
 		#       if the labels arn't at the limits.
 		ws = []
 		hs = []
-		for t in self.yticks:
-			_, w, h = self.get_ticklabel(t)
+		yticks = _calc_ticks((self.user.ymin, self.user.ymin+self.user.ysize),0)
+		for t in yticks:
+			_, w, h = self.get_ticklabel(t,0)
 			ws.append(w)
 			hs.append(h)
 		xmarg[0] = max(max(ws)*1.1, xmarg[0])
@@ -77,95 +80,119 @@ class xy_graph(object):
 		ymarg[0] = max(hs[0]/2 , ymarg[0])
 		ymarg[1] = max(hs[-1]/2 , ymarg[1])
 		
-	def draw_axis(self):
+	def draw_axis(self,ctxId=0):
 		'''Draw axes and ticks.'''
 		#canvas.set_stroke_color(*self.axis_color)
-		self.context.set_draw_color(self.axis_color)
-		self.context.draw_rect(*self.context.user.frame())
-		self.draw_ticks()
+		self.context[ctxId].set_draw_color(self.axis_color)
+		self.context[ctxId].draw_rect(*self.context[ctxId].user.frame())
+		self.draw_ticks(ctxId)
 		self.rescaling=False
 		
-	def get_ticklabel(self,tick):
+	def get_ticklabel(self,tick,ctxId):
 		'''Format a tick label.'''
 		lbl = '%.3g' % tick
-		w,h = self.context.get_text_size(lbl)
+		w,h = self.context[ctxId].get_text_size(lbl)
 		return lbl, math.fabs(w), math.fabs(h)
 
-	def draw_ticks(self):	
-		'''Draw ticks/grid and labels.'''
-		w,h = self.context.user.get_size()
-		x,y = self.context.user.get_origin()
-		for t in self.xticks:			
-			if self.grid:
-				self.context.draw_dashed_line(t, y, t, y+h)
-			else:
-				self.context.draw_line(t, y, t, y+h/100)
-				self.context.draw_line(t, y+h, t, y+h - h/100)
-			lbl, lw, lh = self.get_ticklabel(t)
-			self.context.draw_text(lbl, t-lw/2, y-lh)
-		
-		for t in self.yticks:			
-			if self.grid:
-				self.context.draw_dashed_line(x, t, x+w, t)
-			else:
-				self.context.draw_line(x, t, x+w/100, t)
-				self.context.draw_line(x+w, t, x+w - w/100, t)
-			lbl, lw, lh = self.get_ticklabel(t)
-			self.context.draw_text(lbl, x-lw-w*0.01, t-lh/3)
+	def axSide(self,ctxId):
+		''' left=1, right=-1 '''
+		if ctxId & 1:
+			return -1
+		return 1	
 
-	def add_plot(self, x, y, color=(0.00, 0.00, 0.00), name=None):		
+	def draw_legend(self, datset):
+		ctxId = datset['ctx']
+		w,h = self.context[ctxId].user.get_size()
+		x,y = self.context[ctxId].user.get_origin()
+		if datset['name'] and datset['ctx']==ctxId:
+			if self.axSide(ctxId)>0:
+				self.context[ctxId].draw_text(datset['name'], x, y+h)
+			else:
+				tw,th = self.context[ctxId].get_text_size(datset['name'])
+				self.context[ctxId].draw_text(datset['name'], x+w-tw, y+h)
+
+	def draw_ticks(self,ctxId=0):	
+		'''Draw ticks/grid and labels.'''
+		w,h = self.context[ctxId].user.get_size()
+		x,y = self.context[ctxId].user.get_origin()
+		side=self.axSide(ctxId)
+		yticks = _calc_ticks((y, y+h))
+		for t in self.xticks:
+			if side>0:	# only take x axis from left side		
+				if self.grid:
+					self.context[ctxId].draw_dashed_line(t, y, t, y+h)
+				else:
+					self.context[ctxId].draw_line(t, y, t, y+h/100)
+					self.context[ctxId].draw_line(t, y+h, t, y+h - h/100)
+				lbl, lw, lh = self.get_ticklabel(t,ctxId)
+				self.context[ctxId].draw_text(lbl, t-lw/2, y-lh)
+		
+		for t in yticks:			
+			if self.grid and side>0:
+				self.context[ctxId].draw_dashed_line(x, t, x+w, t)
+			else:
+				self.context[ctxId].draw_line(x, t, x+w/100, t)
+				self.context[ctxId].draw_line(x+w, t, x+w - w/100, t)
+			lbl, lw, lh = self.get_ticklabel(t, ctxId)
+			if side>0:
+				self.context[ctxId].draw_text(lbl, x-lw-w*0.01, t-lh/3)
+			else:
+				self.context[ctxId].draw_text(lbl, x+w*1.01, t-lh/3)
+
+	def add_plot(self, x, y, ctxId=0, color=(0.00, 0.00, 0.00), name=None):		
 		'''Add plot data.'''	
-		plotdata = {'xdata': x, 'ydata': y, 'color': color, 'name':name}
+		plotdata = {'xdata': x, 'ydata': y, 'ctx':ctxId, 'color': color, 'name':name}
 		if self.hold:
 			self.datasets.append(plotdata)
 		else:
 			self.datasets = [plotdata]
 		
-	def draw(self, autoscale=True):		
+	def draw(self, autoscale=True, ctxId=0):		
 		''' draw entire xy_graph as defined by above methods
 			canvas specific : override for other target surface			
 		'''
 		if autoscale:
-			xmin,xmax, ymin,ymax = _calc_limits(self.datasets)
-			self.set_bounds(xmin,ymin, xmax-xmin,ymax-ymin)
+			xmin,xmax, ymin,ymax = _calc_limits(self.datasets,ctxId)
+			self.set_bounds(xmin,ymin, xmax-xmin,ymax-ymin, ctxId)
 		# All drawing operations are enclose within calls to 'begin_updates and
 		# 'end_updates' to improve performance.
-		self.context.record_drawing()
+		self.context[ctxId].record_drawing()
 		#canvas.begin_updates()
 				
 		#self.adjust_margins()
 		if self.rescaling or not autoscale:
-			self.draw_axis()
+			self.draw_axis(ctxId)
 		
 		if not self.datasets:
 			# No data to plot but draw axis
-			self.context.draw_recorded()
+			self.context[ctxId].draw_recorded()
 			logger.warning('no chart data')
 			return
 		
 		# Clip plot lines to wihin the axes.
-		self.context.draw_rect(*self.context.user.frame())
+		self.context[ctxId].draw_rect(*self.context[ctxId].user.frame())
 		#canvas.clip()
 
 		# Plot data as a path with lines between each point.
 		
+		self.context[ctxId].set_emphasis(2)
 		for ds in self.datasets:
-			if ds['ydata']:
+			self.draw_legend(ds)
+			if ds['ydata'] and ds['ctx']==ctxId:
 				if ds['xdata']:
 					xdat=ds['xdata']
 				logger.debug('new plot xlen=%d, ylen=%d, col=%s' % (len(xdat),len(ds['ydata']),ds['color']))
-				self.context.set_draw_color(ds['color'])
-				#canvas.set_stroke_color(*ds['color'])
-				self.context.move_to(xdat[0], ds['ydata'][0])
+				self.context[ctxId].set_draw_color(ds['color'])
+				self.context[ctxId].move_to(xdat[0], ds['ydata'][0])
 				for i in range(1, len(xdat)):
-					self.context.add_line(xdat[i], ds['ydata'][i])
-				self.context.draw_recorded()	# color might change
-			else:
-				logger.warning('empty dataset %s' % ds)
-
+					self.context[ctxId].add_line(xdat[i], ds['ydata'][i])
+				self.context[ctxId].draw_recorded()	# color might change		
 		# Draw all content
-		self.context.draw_recorded()
+		self.context[ctxId].draw_recorded()
 		#canvas.end_updates()
+		self.context[ctxId].set_emphasis(1)
+		
+							
 		
 def _calc_ticks(lim):	
 	'''Return reasonable tick positions given x and y limits.
@@ -195,24 +222,25 @@ def _calc_ticks(lim):
 	n = int((lim[1] - t0)/d) + 1
 	return [t0 + d*t for t in range(0,n)]
 			
-def _calc_limits(datasets):
+def _calc_limits(datasets,ctxId):
 	'''Find the minimum and maximum x and y values in a list of plot lines.
 	'''
 	xmin = ymin = float('Inf')
 	xmax = ymax = float('-Inf')
 	for ds in datasets:
-		t = min(ds['xdata'])
-		if t < xmin:
-			xmin = t
-		t = max(ds['xdata'])
-		if t > xmax:
-			xmax = t
-		t = min(ds['ydata'])
-		if t < ymin:
-			ymin = t
-		t = max(ds['ydata'])
-		if t > ymax:
-			ymax = t		
+		if ds['ctx']==ctxId:
+			t = min(ds['xdata'])
+			if t < xmin:
+				xmin = t
+			t = max(ds['xdata'])
+			if t > xmax:
+				xmax = t
+			t = min(ds['ydata'])
+			if t < ymin:
+				ymin = t
+			t = max(ds['ydata'])
+			if t > ymax:
+				ymax = t		
 	return xmin, xmax, ymin, ymax
 
 				

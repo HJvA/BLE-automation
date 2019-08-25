@@ -116,6 +116,8 @@ class AIOSclient (GATTclient.GATTclient):
 	def getName(self, chId):
 		if chId==self.chofs:
 			return 'digitals'
+		elif chId is None:
+			return ''
 		elif chId>=chANA:
 			return 'analog A%d' % (chId-chANA,)
 		else:

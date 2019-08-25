@@ -28,6 +28,7 @@ def take_sample(datsrc):
 				vrslt['digitals'].set_needs_display()  # uiView_context.vwDigitals.draw invoked
 	if actPage is vchart:
 		rslt = datsrc.queue	# take it all
+		#if rslt and rslt[0]:
 		vchart.results = rslt
 		vchart.set_needs_display()
 
@@ -53,6 +54,7 @@ def show_page(page_idx, pages):
 	else:
 		actPage.hidden=True
 	actPage = pages[page_idx]
+	#vmain.add_subview(actPage)
 	actPage.hidden=False
 	#if page_idx==2:
 	#	grctx.draw_recorded()
@@ -100,7 +102,7 @@ def selDigital(sender):
 	sender.title = ask_selDigital(sender.title)
 	bitnr = int(sender.title[7:])
 	vrslt['bitval'].value = datsrc.aios.getDigBit(bitnr)
-	vrslt['bitmode'].value = (datsrc.aios.getDigMode(bitnr)==mdINP)
+	vrslt['bitmode'].value = (datsrc.aios.getDigMode(bitnr)==mdOUT)
 	logger.info('get bit %s beeing %s' % (bitnr, vrslt['bitval'].value))
 	
 def switchDigital(sender):
@@ -121,10 +123,19 @@ class vwMain(ui.View):
 		datsrc = datSource.datSource(20, 0.1)
 		self.retimer = tls.RepeatTimer(2, take_sample, datsrc=datsrc)
 		self.retimer.start()
+		self['screenShot'].action = self.screenshot_action
 	def will_close(self):
 		print('closing')
 		self.retimer.stop()
 		datsrc.close()
+	def screenshot_action(self,sender):
+		with ui.ImageContext(self.width, self.height) as c:
+			self.draw_snapshot()
+			#c.get_image().show()
+			filename = actPage.name+'_scrn_{}.png'.format(time.strftime("%d-%H:%M:%S", time.localtime()))
+			logger.info('screenshot '+filename)
+			with open(filename, 'wb') as out_file:
+				out_file.write(c.get_image().to_png()) 
 
 class vwSettings(ui.View):
 	def did_load(self):
@@ -136,35 +147,41 @@ class vwResults(ui.View):
 		pass
 		
 class vwChart(ui.View):
-	results={}
+	results={}  # fed in by :..
 	def did_load(self):
+		self.content_mode = ui.CONTENT_CENTER
 		self.background_color = 'beige'
 		self.bg_color = 'white'
+	def layout(self):
+		world= rect_area(*self.bounds).sub_area(0.1,0.05,0.8,0.85)
+		logger.info('changing view size :%s' % world)
+		ctx = uiView_context(self, world_area=world, user_area=rect_area(0,0,10,30))
+		self.grctx ={0:ctx, 1:ctx}  # each channel has its own context i.e. left,right yaxis
 	def draw(self):
-		global grctx
-		grph = xy_graph(grctx)
-		grctx.clear()
-		if self.results:
+		if self.results and self.results[0]: # and self.results[1]:
+			grph = xy_graph(self.grctx)
+			self.grctx[0].clear()
 			for ch,curv in self.results.items():
 				if curv:
 					xs = list(range(len(curv)))
 					logger.info('chan:%s xs:%s ys:%s' % (ch,xs,curv))
-					grph.add_plot(xs, curv, color=(0.00, 0.00, 1.00), name='%s' % get_func(ch+1)[0])
-		grph.draw(autoscale=True)
+					grph.add_plot(xs, curv, ctxId=ch, color=(ch, 0.00, 1.00), name='%s' % get_func(ch+1)[0])
+				else:
+					logger.debug('no curv for ch:%s' % ch)
+				grph.draw(autoscale=True,ctxId=ch)
+		else:
+			logger.debug('no chart result')
+
 		
 ##****** main ******##
 logger = tls.get_logger(__file__, logging.DEBUG)
 
 actPage=None
-vmain = ui.load_view()
 
-#vmain['selPage'].action = selPageAct
 vseti = ui.load_view('uiSettings.pyui')
 vrslt = ui.load_view('uiResults.pyui')
-
 vchart = ui.load_view('uiChart.pyui')
-world = None # will take available area on vchart ui.view 
-grctx = uiView_context(vchart, world_area=world, user_area=rect_area(0,0,10,30))
+vmain = ui.load_view()
 
 show_page(0,(vseti,vrslt,vchart))
 

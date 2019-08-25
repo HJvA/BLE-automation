@@ -16,7 +16,30 @@
           "class" : "SegmentedControl",
           "name" : "selPage"
         },
-        "selected" : true
+        "selected" : false
+      },
+      {
+        "nodes" : [
+
+        ],
+        "frame" : "{{362, 18}, {38, 29}}",
+        "class" : "Button",
+        "attributes" : {
+          "uuid" : "E58E239C-D3BF-4C4E-9C82-8EE75FE86717",
+          "name" : "screenShot",
+          "font_size" : 15,
+          "corner_radius" : 4,
+          "background_color" : "RGBA(0.937255,1.000000,0.901961,1.000000)",
+          "frame" : "{{160, 234}, {80, 32}}",
+          "border_color" : "RGBA(0.803922,0.858824,0.776471,1.000000)",
+          "border_width" : 1,
+          "title" : "",
+          "action" : "",
+          "class" : "Button",
+          "image_name" : "iob:image_24",
+          "flex" : "LB"
+        },
+        "selected" : false
       }
     ],
     "frame" : "{{0, 0}, {400, 500}}",

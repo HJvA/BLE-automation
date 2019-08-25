@@ -21,6 +21,9 @@ class rect_area(object):
 		self.xsize=xsize
 		self.ysize=ysize
 		
+	def __str__(self):
+		return 'org:%s size:%s' % (self.get_origin(),self.get_size())
+		
 	def set_origin(self,xleft,ydown):
 		''' left down corner coordinates
 		'''
@@ -84,6 +87,7 @@ class xy_context(object):
 		self.font_name=font_name
 		self.font_size=font_size
 		self.draw_color = (0,0,0,1.0)
+		self.emphasis=1
 		#print('world:%s user:%s' % (self.world.frame(),self.user.frame()))
 	
 	def set_size(self,width,height):
@@ -92,8 +96,11 @@ class xy_context(object):
 		return self.user.get_size()
 			
 	def set_draw_color(self, color):
-		self.draw_color=color		
-	
+		self.draw_color=color
+			
+	def set_emphasis(self, emp=1):
+		self.emphasis=emp
+		
 	def xyWorld(self,xUser=None,yUser=None):
 		""" Get world coordinates of org or x,y given
 		"""

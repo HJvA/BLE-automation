@@ -44,6 +44,10 @@ class uiView_context(plottls.xy_context):
 		super().set_draw_color(color)
 		ui.set_color(color)
 		
+	def set_emphasis(self,emp):
+		super().set_emphasis(emp)
+		self.path.line_width=emp
+		
 	def clear(self, uFrame=None):
 		#self.fill_rect(*self.xyUser(), *self.whUser(), (1,1,1))
 		#return
@@ -139,8 +143,9 @@ class uiView_context(plottls.xy_context):
 		return self.whUser(*canvas.get_text_size(text, font_name, font_size))	
 
 class vwDigitals(ui.View):
-	bitvals=[]
-	modes=[]
+	''' view for showing binary state of bit array from aios client '''
+	bitvals=[]  # True | False
+	modes=[] # mdINP=1 | mdOUT=0 | mdNOP=3
 	def draw(self):
 		if self.bitvals:
 			n = len(self.bitvals)
@@ -150,10 +155,10 @@ class vwDigitals(ui.View):
 			#logger.debug('digitals:%s world:%s' % (self.bitvals, ctx.world.frame()))
 			for i,bitv,mode in zip(range(n), self.bitvals, self.modes):
 				if mode == 0b11:
-					ctx.fill_oval(i+0.05,0.05,0.9,0.9, 'grey')
+					ctx.fill_oval(i+0.05,0.05,0.9,0.9, 'darkkhaki')
 				else:
 					ctx.fill_oval(i+0.05,0.05,0.9,0.9, 'brown' if mode==0 else 'beige')
-					ctx.fill_oval(i+0.2,0.2,0.6,0.6, (0.922,0.835,0.652,1) if bitv else 'black')
+					ctx.fill_oval(i+0.2,0.2,0.6,0.6, 'gold' if bitv else 'black')
 
 if __name__ == "__main__":	# testing and examples
 	import time	
@@ -166,7 +171,7 @@ if __name__ == "__main__":	# testing and examples
 			""" (not) clipping all beyond frame
 			"""
 			super().__init__(frame=frame,*args,**kwargs)
-			self.add_subview(vwDigitals(frame=(10,340,580,30),background_color='green',name='digitals'))
+			self.add_subview(vwDigitals(frame=(10,340,580,30),background_color='aquamarine',name='digitals'))
 			self.bg_color = 'white'
 			frL=plottls.rect_area(10,10,280,280)
 			frR=frL.offset(300)
