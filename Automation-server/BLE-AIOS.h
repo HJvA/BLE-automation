@@ -1,5 +1,6 @@
 
 //  https://learn.adafruit.com/bluefruit-nrf52-feather-learning-guide/nrf52-adc
+#define ULONG_MAX  0xffffffff 
 
 /* AIOS  ​Automation IO Service */
 #define UUID16_SVC_AUTOMATION_IO     0x1815
@@ -65,6 +66,7 @@
 // these struct result in condition beeing first / Big Endian
 typedef struct time_trig_t {
 	uint8_t  condition;  // 0:no ,1:time interv ,2:time interv cond, 3:count
+	ulong tookms;
 	union {
 		uint32_t interv;		// uint24 [s]
 		uint16_t cnt;
@@ -83,7 +85,7 @@ typedef struct ana_val_trig_t {
 	} lev;
 	} ana_val_trig_t;
 
-const uint8_t nAnaChan = 2;  // NUM_ANALOG_INPUTS-1; //TOTAL_ANALOG_PINS;  leave out Battery channel
+const uint8_t nAnaChan = 7;  // NUM_ANALOG_INPUTS-1; //TOTAL_ANALOG_PINS;  leave out Battery channel
 
 const uint8_t nDigBits = NUM_DIGITAL_PINS; 
 

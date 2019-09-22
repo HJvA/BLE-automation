@@ -91,13 +91,6 @@ void rssi_changed_callback(uint16_t conn_hdl, int8_t rssi)
 	Serial.println();
 }
 
-// time difference between first tick1 and second tick2
-ulong tdiff(ulong tick1, ulong tick2)
-{
-	if (tick2 > tick1)
-		return tick2-tick1;
-	return ULONG_MAX - tick1 + tick2;
-}
 
 void setup()
 {
@@ -136,19 +129,15 @@ void setup()
 	pinIO::setMode(LED_BLUE, OUTPUT);
 }
 
-long tick = millis();
 void loop()
 {
 	float temp;
 	float humidity;
-	long trun = tdiff(tick, millis());
   
 	pinIO::setState(LED_RED, true);
   
 	if ( Bluefruit.connected() ) 
-		if (pollAIOS(trun)) {
-		  tick = millis();
-  
+		if (pollAIOS(millis())) {  // having trigger condition
 		  pollSHT31(temp, humidity);
 		  pollCCS811(temp, humidity);
 		  uint8_t BatPerc = pollBatteryService();

@@ -4,6 +4,7 @@
 """
 import cb
 import time
+from functools import partial
 import logging
 if '.' in __name__:  # imported from higher level package
 	from . import tls
@@ -33,7 +34,6 @@ chSUID = 3  # service uuid
 chCUID = 4  # characteristic uuid
 chCallback = 5
 
-
 def MaskedPropMsg(msgDict, bitmask):
 	lst = (k[1] for k in msgDict if k[0] & bitmask)
 	return ','.join(lst)
@@ -53,11 +53,11 @@ class bleDelegate (object):
 		self.ToBeFnd = set([r[chID] for r in self.lodCharist])
 		logger.info('### ble Scanning %d peripherals ###' % len(self.ToBeFnd))
 		self.charFound = []
-		self.updated = False
+		self.updating = 0
 		# self.respCallback=self._exampleRespCallback
 
 	def close(self):
-		"""
+		""" terminate ble activity
 		"""
 		cb.reset()
 		
@@ -135,31 +135,36 @@ class bleDelegate (object):
 			else:
 				perf = None
 				for p in self.peripherals:	# find actual peripheral with service
-					for srv in p.services:
-						if serv.uuid == srv.uuid:
-							logger.debug('fnd:%s with s:%s c:%s' % (p.name, serv.uuid, c.uuid))
-							perf = p
-							break
+					if p.services: 
+						for srv in p.services:
+							if serv.uuid == srv.uuid:
+								logger.debug('fnd:%s with s:%s c:%s' % (p.name, serv.uuid, c.uuid))
+								perf = p
+								break
 				if not perf:
 					logger.error('perf %s not found in %s' & (p.uuid, serv.uuid))
 					continue
 				isin = self._inLod(perf, c)
 				if isin:
 					self.ToBeFnd.discard(isin[0][chID])
-					logger.info("++ charist %d %s (notif:%d)-->%s" %
+					if hasattr(c,'descriptors'):
+						logger.info('descriptors:%s' % c.descriptors)
+					logger.info("++ charist %d %s (notif:%d)-->%s " %
 							(isin[0][chID], c.uuid, c.notifying, MaskedPropMsg(cbPropMsg, c.properties)))
 					# debug.stop()
 					self.charFound.append({chID:isin[0][chID], 'periph':perf, 'charis':c, chCallback:None})
 				else:
-					logger.info('not %s isin %s p:%s' % (c.uuid, self.ToBeFnd, perf.name))
+					logger.info('not %s isin %s p:%s ' % (c.uuid, self.ToBeFnd, perf.name))
 					
 	def did_write_value(self, c, error):
 		logger.debug('Did write val to c:%s val:%s' % (c.uuid,''.join('{:02x}'.format(x) for x in c.value)))
 
 	def did_update_value(self, c, error):
-		''' called after notify or read event '''
-		# respCallback = next((rec[chCallback] for rec in self.charFound if rec['charis'].uuid == c.uuid), None)
-		lodr = tls.query_lod(self.charFound, lambda rw:rw['charis'].uuid==c.uuid)
+		''' called after notify or read event 
+			as cb does not support descriptors, notifiers are not used for analog chans but just read with waiting for result and chId is found in self.updating
+		'''
+		lodr = tls.query_lod(self.charFound, 
+			lambda rw:rw['charis'].uuid==c.uuid and (rw[chID]==self.updating or self.updating==0))  # may find wrong anachan on notifying !!!
 		if lodr:
 			respCallback = lodr[0][chCallback]
 		else:
@@ -170,56 +175,66 @@ class bleDelegate (object):
 			sval = ''.join('{:02x}'.format(x) for x in c.value)
 			logger.info('Updated value: %s from %s' % (sval, c.uuid))
 		else:
-			respCallback(c, lodr[0][chID])
-		self.updated = True
+			respCallback(c)  # allready having chId from partial, lodr[0][chID])
+		self.updating = 0
 		
 	def did_update_state(self):
 		logger.info('update state:%s' % self.peripheral.state)
 									
 	def write_characteristic(self, chId, chData):
-		"""
-		"""
+		''' write data to ble characteristic '''
 		rec = tls.query_lod(self.charFound, lambda rw: rw[chID]==chId)
 		c = rec[0]['charis']
 		logger.debug('writing val to c:%s val:%s' % (c.uuid,''.join('{:02x}'.format(x) for x in chData)))
 		rec[0]['periph'].write_characteristic_value(c, chData, c.properties & cb.CH_PROP_WRITE_WITHOUT_RESPONSE ==0)
 
-	def read_characteristic(self, chId, waitReceived=False):
-		""" response callback will receive result
+	def read_characteristic(self, chId, waitReceived=False, timeout=10):
+		""" did_update_value callback will receive result
 		"""
 		rec = tls.query_lod(self.charFound, lambda rw:rw[chID]==chId)
-		self.updated = False
+		self.updating = chId
 		if rec:
-			rec[0]['periph'].read_characteristic_value(rec[0]['charis'])
-			while waitReceived and not self.updated:
+			char = rec[0]['charis']
+			rec[0]['periph'].read_characteristic_value(char)
+			tick = time.clock()
+			while waitReceived and self.updating>0 and time.clock()-tick <timeout:
 				time.sleep(0.1)
 			return rec[0]['charis'].value
 		else:
 			logger.warning('no recs reading')
 
-	def setup_response(self, chId, respCallback=None):
-		""" setup notifyer or just get value of characteristic
+	def setup_notification(self, chId):
+		""" setup notification for characteristic that support it
+		  returns True when successfull or allready notifying
 		"""
 		isin = tls.query_lod(self.charFound, lambda rw:rw[chID]==chId)
-		p = isin[0]['periph']
 		c = isin[0]['charis']
-		logger.info('setup response for %s with prop:%s notifying:%d' % (p.name, MaskedPropMsg(cbPropMsg, c.properties), c.notifying))
-		isin[0][chCallback] = respCallback  # ???
 		if c.notifying:
-			pass  # p.set_notify_value(c, True)
-		elif c.properties & cb.CH_PROP_INDICATE:
+			return True
+		p = isin[0]['periph']
+		logger.info('setup notification for perf:%s (c:%d) with prop:%s notifying:%d' % (p.name,chId, MaskedPropMsg(cbPropMsg, c.properties), c.notifying))
+		if c.properties & cb.CH_PROP_INDICATE:
 			p.set_notify_value(c, True)
 		elif c.properties & cb.CH_PROP_NOTIFY:
 			p.set_notify_value(c, True)
-					
-	def _exampleRespCallback(self, charis):
+		else:
+			return False
+		return True
+		
+	def setup_response(self, chId, respCallback=None):
+		""" setup callback for value of characteristic
+		"""
+		isin = tls.query_lod(self.charFound, lambda rw:rw[chID]==chId)
+		isin[0][chCallback] = partial(respCallback ,chId=chId)   # to be used in self.did_update_value
+			
+	def _exampleRespCallback(self, charis, chId=0):
 		if charis:
-			logger.info('callback:%s' % charis.value)
+			logger.info('chId:%d callback:%s' % (chId,charis.value))
 		else:
 			logger.error('no charis')
 			return
 		sval = ''.join('{:02x}'.format(x) for x in charis.value)
-		logger.info('Updated %s value: %s i.e. %s' % (charis.uuid, sval, tls.bytes_to_int(charis.value, '<')))
+		logger.info('Updated %d:%s value: %s i.e. %s' % (chId,charis.uuid, sval, tls.bytes_to_int(charis.value, '<')))
 		
 			
 def discover_BLE_characteristics(lodBLE):
@@ -249,6 +264,8 @@ CHRECO2  = '7397'
 CHRTVOC  = '7398'
 
 MOOSHI   =  None #'Mooshi'
+IPHONE   = 'hj xFony'
+HUELAMP  = None #'Hue Lamp'
 
 if __name__ == "__main__":
 	lod = list()
@@ -264,6 +281,10 @@ if __name__ == "__main__":
 		lod.extend([{chPERF:PerfName, chID:i, chPUID:None, chCUID:ch} 
 		  for i,ch in zip((0,1,2,3,4,5,6),(CHRDIGIO,CHRANAIO,CHRANAIO,CHRTEMP,CHRHUM,CHRECO2,CHRTVOC))])
 		logger.info(lod)
+	if IPHONE:
+		lod.extend([{chPERF:IPHONE, chID:12, chPUID:None, chCUID:'9A37'}])
+	if HUELAMP:
+		lod.extend([{chPERF:HUELAMP, chID:13, chPUID:None, chCUID:'47A2'}])
 	cbDelg = discover_BLE_characteristics(lod)
 	
 	for rec in cbDelg.lodCharist:
@@ -272,8 +293,14 @@ if __name__ == "__main__":
 		cbDelg.write_characteristic(SERIN, bytes([0x00, 0x01]))
 		cbDelg.setup_response(SEROUT)
 	if SVRAUTOM:
-		cbDelg.setup_response(3, cbDelg._exampleRespCallback)
-		cbDelg.read_characteristic(0)
+		cbDelg.setup_response(0, cbDelg._exampleRespCallback)  # CHRDIGIO
+		cbDelg.setup_notification(0)
+		cbDelg.setup_response(2, cbDelg._exampleRespCallback)  # CHRANAIO
+		cbDelg.read_characteristic(2) 
+		cbDelg.setup_response(3, cbDelg._exampleRespCallback)  # CHRTEMP
+		cbDelg.read_characteristic(3)
+		cbDelg.setup_response(4, cbDelg._exampleRespCallback)  # CHRHUM
+		cbDelg.setup_notification(4)
 	time.sleep(10)
 	cb.reset()
 	print('bye')

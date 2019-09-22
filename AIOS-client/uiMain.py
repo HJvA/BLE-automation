@@ -19,7 +19,6 @@ def take_sample(datsrc):
 		if rslt:
 			logger.info('setting rslt:%s' % rslt)
 			update_results(rslt)
-			#digitals = datsrc.aios.readDigBits(waitReceived=False)
 			bits = [datsrc.aios.getDigBit(bitnr) for bitnr in range(datsrc.aios.nDigBits())]
 			modes = [datsrc.aios.getDigMode(bitnr) for bitnr in range(datsrc.aios.nDigBits())]
 			if bits:
@@ -28,7 +27,6 @@ def take_sample(datsrc):
 				vrslt['digitals'].set_needs_display()  # uiView_context.vwDigitals.draw invoked
 	if actPage is vchart:
 		rslt = datsrc.queue	# take it all
-		#if rslt and rslt[0]:
 		vchart.results = rslt
 		vchart.set_needs_display()
 
@@ -59,10 +57,13 @@ def show_page(page_idx, pages):
 	#if page_idx==2:
 	#	grctx.draw_recorded()
 	
-def set_func(chan, mmFunction=None):
-	vseti['function%d' % chan].title = mmFunction
-	vrslt['unit%d' % chan].text = 'V' #datsrc.aios.getUnit(datsrc.func[chan-1])
+def set_func(chan, nmFunc=None):
+	vseti['function%d' % chan].title = nmFunc
 	vseti['target%d' % chan].text = '100'
+	if nmFunc:
+		chId = datsrc.set_function(chan-1, nmFunc)
+		vrslt['unit%d' % chan].text = datsrc.aios.getUnit(chId)
+		vrslt['rsltLbl%d' % chan].text = nmFunc
 
 def get_func(chan):
 	return vseti['function%d' % chan].title, vrslt['unit%d' % chan].text, vseti['target%d' % chan].text
@@ -80,11 +81,9 @@ def ask_function(chan):
 def func1act(sender):
 	''' set picked item to combo '''
 	sender.title = ask_function(1)
-	datsrc.set_function(0, sender.title)
 
 def func2act(sender):
 	sender.title = ask_function(2)
-	datsrc.set_function(1, sender.title)
 
 def selPageAct(sender):
 	''' handle event changing tab '''
@@ -93,8 +92,6 @@ def selPageAct(sender):
 
 def ask_selDigital(deflt):
 	lds =ui.ListDataSource([{'title':'pin nr %d' % btnr} for btnr in range(datsrc.aios.nDigBits())]	)
-	#bitnr = 16 #next(i for int(nm[7:]),nm in lds.items() if deflt==nm)
-	#sel['title'] = 'pin nr %d' % bitnr
 	sel = dialogs.list_dialog('select pin nr',lds.items)
 	return sel['title'] if sel else 'select pin number'
 
@@ -127,6 +124,7 @@ class vwMain(ui.View):
 	def will_close(self):
 		print('closing')
 		self.retimer.stop()
+		time.sleep(1)
 		datsrc.close()
 	def screenshot_action(self,sender):
 		with ui.ImageContext(self.width, self.height) as c:

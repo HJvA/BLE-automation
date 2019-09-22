@@ -68,6 +68,7 @@ bool setupCCS811(){
   eCO2c.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
   eCO2c.setFixedLen(2); // Alternatively .setMaxLen(uint16_t len);
   eCO2c.begin();
+  TVOCc.setUserDescriptor(CO2descr);
   // getting errors when activating the user descr ??
   //eCO2c.addDescriptor(DSC_charac_user_descr, CO2descr, 4, SECMODE_OPEN, SECMODE_NO_ACCESS);
 
@@ -77,6 +78,8 @@ bool setupCCS811(){
   TVOCc.begin();
   //err_t BLECharacteristic::addDescriptor(BLEUuid bleuuid, void const * content, uint16_t len, BleSecurityMode read_perm, BleSecurityMode write_perm)
   //TVOCc.addDescriptor(DSC_charac_user_descr, TVOCdescr, strlen(TVOCdescr), SECMODE_OPEN, SECMODE_NO_ACCESS);
+  TVOCc.setUserDescriptor(TVOCdescr);
+  //void BLECharacteristic::setReportRefDescriptor(uint8_t id, uint8_t type)
   return true;
 }
 

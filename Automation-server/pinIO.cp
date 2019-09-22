@@ -232,8 +232,11 @@ word anaIO::produceBLEana(byte chan){
     return 0xfffc;
   if (isReserved(anachan[chan].pin))
     return 0xfffd;
-  if (anachan[chan].mode == IO_NONE)
-    setMode(chan, INPUT_ANALOG);
+  if (anachan[chan].mode == IO_NONE) {
+    //  setMode(chan, INPUT_ANALOG);
+    Serial.print(chan,DEC);Serial.println(' ana not set to input');
+    return anachan[chan].anaval;
+  }
   word newval = anachan[chan].getAnaState();
   //if (oldval == newval)
   //		return 0xffff;

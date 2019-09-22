@@ -1,6 +1,5 @@
 import logging
 
-
 if '.' in __name__:  # imported from higher level package
 	from . import tls
 	logger = tls.get_logger()
@@ -12,15 +11,16 @@ else:
 	logger = tls.get_logger(__file__,logging.DEBUG)
 import lib.cbBle as cb
 
-chTEMP=0
-chHUMI=1
-chECO2=2
-chTVOC=3
+chTEMP=1
+chHUMI=2
+chECO2=3
+chTVOC=4
 	
 PerpheralName='AIOS'
 names =  {chTEMP:'temperature',chHUMI:'humidity', chECO2:'eCO2', chTVOC:'TVOC'}
 units =  {chTEMP:'°C',chHUMI:'%', chECO2:'ppm', chTVOC:'ppm'}
 scales = {chTEMP:100.0,chHUMI:100.0}
+# default 4 sensors defined to be discovered : chTEMP,chHUMI,chECO2,chTVOC
 lod =[{cb.chPERF:PerpheralName, cb.chID:i, cb.chPUID:None, cb.chCUID:ch} 
 		  for i,ch in zip(names.keys(),(cb.CHRTEMP,cb.CHRHUM,cb.CHRECO2,cb.CHRTVOC))]	
 
@@ -36,29 +36,39 @@ class GATTclient (object):
 			self.nvals[lodr[cb.chID]] =0
 
 	def getlod(self):
-		''' definition of expected characteristics
+		''' definition of expected characteristics to be discovered
 		 may be overriden to give extra of them '''
 		logger.info('lod :%d' % len(lod))
 		return lod
 				
 	def _RespCallback(self,charis,chId):
+		''' receive val from ble server
+			add to average buffer
+		'''
 		num = tls.bytes_to_int(charis.value,'<')
 		logger.debug('receiving %s = %s (%d)' % (self.getName(chId),charis.value,num))
 		self.vals[chId] += num
 		self.nvals[chId] += 1
 		
 	def getValue(self, chId, waitReceived=True):
-		''' receives values from aios server 
+		''' process values from aios server 
 			waits for at least 1 value, and averages if multiple
 		'''
-		if waitReceived or self.nvals[chId]==0:
+		if waitReceived:
 			self.delg.read_characteristic(chId, waitReceived=True)
-		if self.nvals[chId]:
-			val = self.vals[chId] / self.nvals[chId]
-		else:
-			val = float('NaN')
-		if chId in scales:
-			val /= scales[chId]
+		elif self.nvals[chId]==0:
+			if self.delg.setup_notification(chId):
+				pass # notifycation activated
+			else:	# not supporting notification
+				self.delg.read_characteristic(chId, waitReceived=False)
+			time.sleep(0.1)  # allow time for req val to arrive
+			
+		val = float('NaN')
+		if chId in self.nvals:
+			if self.nvals[chId]:
+				val = self.vals[chId] / self.nvals[chId]
+			if chId in scales:
+				val /= scales[chId]
 		self.vals[chId] = 0.0
 		self.nvals[chId] = 0
 		return val

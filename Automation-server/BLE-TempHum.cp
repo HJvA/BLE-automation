@@ -55,25 +55,35 @@ void pollSHT31(float & temp, float & humidity) {
   temp = sht31->readTemperature();
   humidity = sht31->readHumidity();
   if ( Bluefruit.connected() ) {
-    if (st31c.notifyEnabled()) {
-      if (! isnan(temp)) {
-        int16_t tmp = ROUND_2_INT(temp*100.0);
+    if (! isnan(temp)) {
+      int16_t tmp = ROUND_2_INT(temp*100.0);
+      if (st31c.notifyEnabled()) {
         if ( st31c.notify16(tmp) ){
-          Serial.print("temperature updated : "); Serial.println(temp); 
+          Serial.print("temperature notified : "); Serial.println(temp); 
         }else{
+          //st31c.write16(tmp);
+          //Serial.print("temperature : "); Serial.println(temp); 
           Serial.println("ERROR: Notify not set in the CCCD or not connected!");
         }
+      }else{
+        st31c.write16(tmp);
+        Serial.print("temperature : "); Serial.println(temp); 
       }
     }
-    if (sh31c.notifyEnabled()) {
-      if (! isnan(humidity)) {
-        uint16_t hum = ROUND_2_INT(humidity*100.0);
+    if (! isnan(humidity)) {
+      uint16_t hum = ROUND_2_INT(humidity*100.0);
+      if (sh31c.notifyEnabled()) {
         if ( sh31c.notify16(hum) ){
-          Serial.print("humidity updated : "); Serial.println(humidity); 
+          Serial.print("humidity notified : "); Serial.println(humidity); 
         }else{
+          sh31c.write16(hum);
+          //Serial.print("humidity written : "); Serial.println(humidity); 
           Serial.println("ERROR: Notify not set in the CCCD or not connected!");
         }
-      }
+       }else{
+          sh31c.write16(hum);
+          Serial.print("humidity written : "); Serial.println(humidity); 
+       }
     }
   }
 }

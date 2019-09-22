@@ -211,8 +211,8 @@
         "frame" : "{{17, 268}, {60, 32}}",
         "class" : "Label",
         "attributes" : {
-          "name" : "onofflbl",
           "flex" : "RTB",
+          "name" : "onofflbl",
           "frame" : "{{125, 204}, {150, 32}}",
           "uuid" : "83DBD671-2A1C-4938-81A4-3C73ED0E8E3F",
           "class" : "Label",
@@ -230,13 +230,70 @@
         "frame" : "{{310, 268}, {84, 24}}",
         "class" : "Label",
         "attributes" : {
-          "name" : "modelbl",
           "flex" : "LTB",
+          "name" : "modelbl",
           "frame" : "{{125, 204}, {150, 32}}",
           "uuid" : "FE11A7D0-5E1A-45A8-A514-CAD4B261DAFD",
           "class" : "Label",
           "alignment" : "right",
           "text" : "inp\/outp",
+          "font_size" : 18,
+          "font_name" : "<System>"
+        },
+        "selected" : false
+      },
+      {
+        "nodes" : [
+
+        ],
+        "frame" : "{{17, 271}, {60, 32}}",
+        "class" : "Label",
+        "attributes" : {
+          "flex" : "RTB",
+          "font_name" : "<System>",
+          "frame" : "{{125, 204}, {150, 32}}",
+          "uuid" : "83DBD671-2A1C-4938-81A4-3C73ED0E8E3F",
+          "class" : "Label",
+          "alignment" : "left",
+          "text" : "off\/on",
+          "name" : "onofflbl",
+          "font_size" : 18
+        },
+        "selected" : false
+      },
+      {
+        "nodes" : [
+
+        ],
+        "frame" : "{{17, 134}, {160, 26}}",
+        "class" : "Label",
+        "attributes" : {
+          "flex" : "RTB",
+          "font_name" : "<System>",
+          "frame" : "{{125, 204}, {150, 32}}",
+          "uuid" : "83DBD671-2A1C-4938-81A4-3C73ED0E8E3F",
+          "class" : "Label",
+          "alignment" : "left",
+          "text" : "lbl2",
+          "font_size" : 18,
+          "name" : "rsltLbl2"
+        },
+        "selected" : false
+      },
+      {
+        "nodes" : [
+
+        ],
+        "frame" : "{{17, 4}, {160, 26}}",
+        "class" : "Label",
+        "attributes" : {
+          "flex" : "RTB",
+          "name" : "rsltLbl1",
+          "frame" : "{{125, 204}, {150, 32}}",
+          "uuid" : "83DBD671-2A1C-4938-81A4-3C73ED0E8E3F",
+          "class" : "Label",
+          "alignment" : "left",
+          "text" : "lbl1",
           "font_size" : 18,
           "font_name" : "<System>"
         },

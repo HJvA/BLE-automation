@@ -19,8 +19,10 @@ class datSource (object):
 	def set_function(self,chan,func):
 		if type(func) is str:
 			nms = self.getFuncNames()
+			logger.info('setting %s on chan %d' % (func,chan))
 			func = next(fnc for fnc,nm in nms.items() if nm==func)
 		self.funcs[chan]=func
+		return func # chId
 		
 	def take_sample(self):
 		for chan,chId in self.funcs.items():

@@ -12,35 +12,37 @@ logger = tls.get_logger(__file__, logging.DEBUG)
 from lib import cbBle as cb,GATTclient
 #from pyploty.uiView_context import uiView_context
 
-chDIGI = 10		# func id for digitals
-chANA  = 11		# func id for first analog channel
+chDIGI    = 10		# func id for digitals
+chANA1ST  = 11		# func id for first analog channel
 mdOUT = 0b00	# following GATT AIOS
 mdINP = 0b10
 mdNOP = 0b11
+anaDSCFACT = 10000
 
 class AIOSclient (GATTclient.GATTclient):
 	""" interfacing to device with BLE automation-IO profile
 	"""
 	bitvals = []
 	digmods = []
-	def __init__(self, *args, nAnaChans=2, **kwargs):
+	def __init__(self, *args, nAnaChans=3, **kwargs):
 		""" 	"""
 		self.nAnaChans = nAnaChans			
 		super().__init__(*args, **kwargs)
-		
+			
 		self.delg.setup_response(self.chofs, self._digCallback)
 		self.readDigBits()
-		#for i in range(nAnaChans):
+		for i in range(nAnaChans):
+			GATTclient.scales[chANA1ST+i] = anaDSCFACT
 		#	self.delg.setup_response(i+1+self.chofs, self._anaCallback)
 	
 	def getlod(self):
-		''' override to add specific AIOS characteristic definitions '''
+		''' override to add specific AIOS characteristic definitions to be discovered '''
 		PerfName='AIOS'
 		self.chofs = chDIGI
 		lod = super().getlod()
 		lod.extend([{cb.chPERF:PerfName, cb.chID:self.chofs, cb.chPUID:None, cb.chCUID:cb.CHRDIGIO}])
 		for i in range(self.nAnaChans):
-			lod.append({cb.chPERF:PerfName, cb.chID:i+chANA, cb.chPUID:None, cb.chCUID:cb.CHRANAIO})
+			lod.append({cb.chPERF:PerfName, cb.chID:i+chANA1ST, cb.chPUID:None, cb.chCUID:cb.CHRANAIO})
 		return lod
 	
 	def _extBitsLen(self, nbits):
@@ -63,6 +65,7 @@ class AIOSclient (GATTclient.GATTclient):
 		logger.info('dig receive:%s'  % '.'.join('{:02x}'.format(x) for x in charact.value))
 			
 	def readDigBits(self, waitReceived=True):
+		self.delg.setup_notification(self.chofs)	# only effectuates first time
 		self.delg.read_characteristic(self.chofs, waitReceived)
 		
 	def getDigBit(self,bitnr):
@@ -111,26 +114,32 @@ class AIOSclient (GATTclient.GATTclient):
 		return len(self.bitvals)
 		
 	def getAnaVal(self, Ach, waitReceived=True):
-		return super().getValue(Ach+self.chofs+1, waitReceived)
+		return super().getValue(Ach+self.chofs+0, waitReceived)
 	
 	def getName(self, chId):
 		if chId==self.chofs:
 			return 'digitals'
 		elif chId is None:
 			return ''
-		elif chId>=chANA:
-			return 'analog A%d' % (chId-chANA,)
+		elif chId>=chANA1ST:
+			if chId-chANA1ST <= self.nAnaChans:
+				return 'analog A%d' % (chId-chANA1ST,)
+			return 'na'
 		else:
 			return super().getName(chId)
+			
+	def getUnit(self, chId):
+		return super().getUnit(chId)
 
 if __name__=="__main__":
-	aios = AIOSclient(nAnaChans=2)
+	aios = AIOSclient(nAnaChans=3)
 	time.sleep(10)
 	aios.setDigBit(19,1)
-	aios.readDigBits()
-	aios.getDigBit(19)
+	print(aios.readDigBits())
+	print(aios.getDigBit(19))
 	bits = [aios.getDigBit(bitnr) for bitnr in range(aios.nDigBits())]
-	aios.getAnaVal(1)
+	print(bits)
+	print(aios.getAnaVal(2))
 	time.sleep(1)
 	aios.setDigBit(19,0)
 	logger.warning('bye')

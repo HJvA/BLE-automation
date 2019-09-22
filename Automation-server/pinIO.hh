@@ -48,6 +48,7 @@ class anaIO : public pinIO {
 		static void createAnaPins(byte nPins);
     static bool isAnalog(byte pin);
 		static void setMode(byte chIdx, byte mode) {if (chIdx<nChans) anachan[chIdx].setMode(mode); };
+    static byte getMode(byte chIdx) { return anachan[chIdx].mode; };
       //static void setState(byte bitId, bool bit) {if (chIdx<nChans) anachan[bitId].setState(bit); };;
 		static word getAnaState(byte chIdx) {if (chIdx<nChans) return anachan[chIdx].getAnaState(); };
 		static word produceBLEana(byte chIdx);

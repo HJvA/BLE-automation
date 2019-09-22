@@ -49,7 +49,7 @@ void write_callback(short unsigned int conn_hdl, BLECharacteristic* chr, uint8_t
    }
 }
 
-// event handler 
+// event handler Client Characteristic Configuration Descriptor updated
 void cccd_callback(uint16_t conn_hdl, BLECharacteristic* chr, uint16_t cccd_value)
 {
     Serial.print("CCCD Updated: ");
@@ -67,6 +67,14 @@ void cccd_callback(uint16_t conn_hdl, BLECharacteristic* chr, uint16_t cccd_valu
     }
 }
 
+// time difference between first tick1 and second tick2
+ulong tdiff(ulong tick1, ulong tick2)
+{
+	if (tick2 > tick1)
+		return tick2-tick1;
+	return ULONG_MAX - tick1 + tick2;
+}
+
 // Configure the automation io service
 void setupAIOS(void) {
   pinIO::createDigBits(nDigBits);
@@ -80,12 +88,12 @@ void setupAIOS(void) {
         pinIO::setMode(pin, IO_NONE);
   }
   // setup default trigger conditions
-  dig_time_trig = (time_trig_t) { 1, 5000U };  // { .condition=1, .value=5s };
+  dig_time_trig = (time_trig_t) { 1, millis(), 5000U };  // { .condition=1, .tookms=0, .value=5s };
   dig_val_trig = { 0x00 };  // { .condition=0, .mask={} };  // not used
   
   for (byte pini=0; pini<nAnaChan; pini++) {
     anac[pini] = BLECharacteristic(UUID16_CHR_ANALOG);  // chracteristic for each pin
-    ana_time_trigs[pini] = { 1, 5 };		// not used
+    ana_time_trigs[pini] = { 1,0, 60000U };		// 
     ana_val_trigs[pini] = { 3, 10000 }; // only notify when step>1V i.e. default setting
   }
   
@@ -108,42 +116,71 @@ void setupAIOS(void) {
     anac[ch].setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
     anac[ch].setFixedLen(2);
     // (uint8_t type , int8_t exponent, uint16_t unit, uint8_t name_space, uint16_t descritpor);
+    // NOTE also used to recognise individual channels
     anac[ch].setPresentationFormatDescriptor(DSC_data_type_uint16, -4, UN_voltage_volt, 0, ch); 
     anac[ch].begin();
+    char buf [5];
+    sprintf(buf, "ch%d", ch);
+    anac[ch].setUserDescriptor(buf); // alternative to recognise indiv chans
     anac[ch].addDescriptor(DSC_value_trigger_setting, &ana_val_trigs[ch], sizeof(ana_val_trig_t), SECMODE_OPEN, SECMODE_OPEN); // only 1 setting supported now
   }
   //Serial.println("AIOS service been setup, starting to poll");
 }
 
+uint16_t takeAnaGatt(int chan) {
+	anaIO::setMode(chan, INPUT_ANALOG);
+	uint16_t ana = anaIO::produceBLEana(chan);
+	if (ana < 0xfffe) {	// valid sample
+		float volt = ana * 3.6 / 1023.0;  // analogReadResolution(10); analogReference(AR_DEFAULT);
+		//float volt = ana * 3.6 / 4095.0;  // analogReadResolution(12); analogReference(AR_INTERNAL);
+		//float volt = ana * 3.6 / 16383.0;  // analogReadResolution(14); analogReference(AR_INTERNAL);      
+		ana = ROUND_2_UINT(volt*10000);   // exponent -4 => 10000 as specified in descriptor
+	}
+	return ana;
+}
+
 uint16_t mvolt[nAnaChan]; // stores latest analog values
 // arduino keeps calling this when contacted
-word pollAIOS(ulong trun){
+word pollAIOS(ulong tick){
 	byte digdata[LenDigBits];
 	word changed = pinIO::produceBLEdig(digdata, sizeof(digdata));
-	if ( dig_time_trig.condition==1 && trun>dig_time_trig.tm.interv ){  // notification condition
-		changed=1;
-		digc.notify(digdata, sizeof(digdata));
-		Serial.print("digital notified trun ms: "); Serial.println(trun, DEC); 
-	}else if (changed) {  // just save to characterisric
+	ulong trun = tdiff(dig_time_trig.tookms, tick);
+	if (digc.notifyEnabled()) {
+		if ( dig_time_trig.condition==1 && trun>dig_time_trig.tm.interv ){  // notification condition
+			changed=1;
+			digc.notify(digdata, sizeof(digdata));
+			Serial.print("digital notified trun ms: "); Serial.println(trun, DEC); 
+			dig_time_trig.tookms = tick;
+		} else {
+			digc.write(digdata, sizeof(digdata));
+		}
+	} else if (changed) {  // just save to characterisric
 		changed=0;
 		digc.write(digdata, sizeof(digdata));
 		Serial.println("updated digdata");
 	}
     
 	for (int chan = 0; chan < nAnaChan; chan++) {
-		uint16_t ana = anaIO::produceBLEana(chan);
+		trun = tdiff(ana_time_trigs[chan].tookms, tick);
+		uint16_t ana = takeAnaGatt(chan);  // anaIO::produceBLEana(chan);
 		if (ana < 0xfffe) {	// valid sample
-			float volt = ana * 3.6 / 1023.0;  // analogReadResolution(10); analogReference(AR_DEFAULT);
-			//float volt = ana * 3.6 / 4095.0;  // analogReadResolution(12); analogReference(AR_INTERNAL);
-			//float volt = ana * 3.6 / 16383.0;  // analogReadResolution(14); analogReference(AR_INTERNAL);
-         
-			ana = ROUND_2_UINT(volt*10000);   // exponent -4 => 10000 as specified in descriptor
-			if (ana_val_trigs[chan].condition==3 && ana_val_trigs[chan].lev.val<abs(ana-mvolt[chan])) {
-				anac[chan].notify16(ana);
-				Serial.print("analog");Serial.print(chan);Serial.print(" notified dev[V]: "); Serial.println(float(ana-mvolt[chan])/10000, DEC ); 
-				mvolt[chan] = ana;
-			}else{
-				anac[chan].write16(ana);
+			if (anac[chan].notifyEnabled()) {
+				if ((ana_val_trigs[chan].condition==3 && ana_val_trigs[chan].lev.val<abs(ana-mvolt[chan])) ||
+					(ana_time_trigs[chan].condition==1 && trun>ana_time_trigs[chan].tm.interv)) {
+					anac[chan].notify16(ana);
+					Serial.print("analog trun ms:"); Serial.print(trun, DEC);
+					Serial.print(" chan:");Serial.print(chan);Serial.print(" notified dev[V]:"); Serial.println(float(ana-mvolt[chan])/10000, DEC ); 
+					ana_time_trigs[chan].tookms = tick;
+					mvolt[chan] = ana;
+					changed++;
+				} else {
+					anac[chan].write16(ana);
+				}
+			} else if (anaIO::getMode(chan) == INPUT_ANALOG) {
+				uint16_t ana = takeAnaGatt(chan);
+				if (ana < 0xfffe) {	// valid sample
+					anac[chan].write16(ana);
+				}
 			}
 		}
 	} 

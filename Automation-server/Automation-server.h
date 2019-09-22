@@ -11,7 +11,6 @@ https://learn.adafruit.com/bluefruit-nrf52-feather-learning-guide/blecharacteris
 https://github.com/firmata/protocol
 */
 
-#define ULONG_MAX  0xffffffff 
 
 #define UUID16_CHR_DEW_POINT           0x2A7B
 
