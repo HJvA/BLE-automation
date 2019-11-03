@@ -1,3 +1,5 @@
+''' general purpose tool for drawing lines and shapes to pythonista uiImageView class'''
+
 import canvas
 import ui
 import sys

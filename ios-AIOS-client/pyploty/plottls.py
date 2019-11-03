@@ -1,4 +1,4 @@
-""" genral purpose tools for drawing to canvas
+""" general purpose tools defining a context for drawing to 'something'
     including mapping of coordinate systems
 """
 from __future__ import division

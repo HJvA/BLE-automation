@@ -1,4 +1,4 @@
-''' inspired by Mats Klingberg 
+''' drawing charts to one of the context classes 
 '''
 import math
 import canvas

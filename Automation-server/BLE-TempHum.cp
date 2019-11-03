@@ -14,12 +14,14 @@
 #define UUID16_CHR_TEMPERATURE      0x2A6E
 #define UUID16_CHR_HUMIDITY         0x2A6F
 #define I2Cadr 0x44   // Set to 0x45 for alternate i2c addr
-
+#define NOTIFYPERC 1.0
 #define ROUND_2_INT(f) ((int)(f >= 0.0 ? (f + 0.5) : (f - 0.5)))
 
 Adafruit_SHT31* sht31; 
 BLECharacteristic st31c ;  // temperature 
 BLECharacteristic sh31c ;  // humidity
+float prevTemp;
+float prevHum;
 
 bool setupSHT31() {
   Serial.print("Setup SHT31 TempHum Sensor on I2C adr:0x");Serial.println(I2Cadr, HEX);
@@ -31,6 +33,8 @@ bool setupSHT31() {
     sht31 = NULL;
     return false;
   }
+  prevTemp = 0.0;
+  prevHum = 0.0;
   st31c = BLECharacteristic(UUID16_CHR_TEMPERATURE);
   sh31c = BLECharacteristic(UUID16_CHR_HUMIDITY);
   
@@ -49,36 +53,49 @@ bool setupSHT31() {
   return true;
 }
 
-void pollSHT31(float & temp, float & humidity) {
+float checkTrig(float val, float & prev) {
+  float chg = (val - prev) * 100.0 / prev;
+  Serial.print(" THchange%:"); Serial.println(chg);
+  if (fabs(chg) > NOTIFYPERC) {
+    prev = val;
+    return chg;
+  }
+  return 0.0;
+}
+
+bool pollSHT31(float & temp, float & humidity) {
   if (sht31 == NULL)
-    return;
+    return false;
   temp = sht31->readTemperature();
   humidity = sht31->readHumidity();
+  float changed = 0;
   if ( Bluefruit.connected() ) {
-    if (! isnan(temp)) {
+    if (! isnan(temp) ) {
       int16_t tmp = ROUND_2_INT(temp*100.0);
-      if (st31c.notifyEnabled()) {
+      changed = fabs(checkTrig(temp, prevTemp));
+      if (st31c.notifyEnabled() && changed>0.0 ) {
         if ( st31c.notify16(tmp) ){
-          Serial.print("temperature notified : "); Serial.println(temp); 
+          Serial.print("temperature notified : "); Serial.print(temp);  
         }else{
-          //st31c.write16(tmp);
-          //Serial.print("temperature : "); Serial.println(temp); 
-          Serial.println("ERROR: Notify not set in the CCCD or not connected!");
+          st31c.write16(tmp);
+          Serial.println("ERROR: NO Notify for temp");
         }
-      }else{
+      }else{  // not notifying
         st31c.write16(tmp);
-        Serial.print("temperature : "); Serial.println(temp); 
+        Serial.print("wrote temperature : "); Serial.println(temp); 
       }
     }
-    if (! isnan(humidity)) {
+    if (! isnan(humidity) ) {
       uint16_t hum = ROUND_2_INT(humidity*100.0);
-      if (sh31c.notifyEnabled()) {
+      float humchg = checkTrig(humidity, prevHum);
+      changed += fabs(humchg);
+      if (sh31c.notifyEnabled() && humchg>0.0 ) {
         if ( sh31c.notify16(hum) ){
-          Serial.print("humidity notified : "); Serial.println(humidity); 
+          Serial.print("humidity notified : "); Serial.print(humidity);  
         }else{
           sh31c.write16(hum);
           //Serial.print("humidity written : "); Serial.println(humidity); 
-          Serial.println("ERROR: Notify not set in the CCCD or not connected!");
+          //Serial.println("ERROR: Notify not set in the CCCD or not connected!");
         }
        }else{
           sh31c.write16(hum);
@@ -86,4 +103,5 @@ void pollSHT31(float & temp, float & humidity) {
        }
     }
   }
+  return changed;
 }

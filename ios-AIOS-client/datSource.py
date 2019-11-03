@@ -1,3 +1,5 @@
+''' fetching and buffering data from an AIOSclient '''
+
 import logging,time
 
 if '.' in __name__:  # imported from higher level package

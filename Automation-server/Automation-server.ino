@@ -134,18 +134,19 @@ void loop()
 	float temp;
 	float humidity;
   
-	pinIO::setState(LED_RED, true);
   
-	if ( Bluefruit.connected() ) 
-		if (pollAIOS(millis())) {  // having trigger condition
-		  pollSHT31(temp, humidity);
-		  pollCCS811(temp, humidity);
+	if ( Bluefruit.connected() ) {
+ 		bool changed = pollSHT31(temp, humidity);
+    changed |= pollCCS811(temp, humidity);
+ 		if (pollAIOS(millis()) || changed ) {  // having trigger condition
+      pinIO::setState(LED_RED, true);
 		  uint8_t BatPerc = pollBatteryService();
 		  Serial.print(" Temp:");Serial.print(temp, DEC); Serial.print(" Humi:");Serial.print(humidity, DEC);
 		  Serial.print(" Bat%:");Serial.println(BatPerc);
 	  }
+	}
 
-	delay(10);
+	delay(20);
 	pinIO::setState(LED_RED, false);
 	delay(1000UL);
 }

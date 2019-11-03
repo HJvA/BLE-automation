@@ -7,6 +7,7 @@
 //Click here to get the library: http://librarymanager/All#SparkFun_CCS811
 #include "SparkFunCCS811.h" 
 #define CCS811_ADDR 0x5B //Default I2C Address
+#define NOTIFYPERC  8.0
 
 CCS811* ccs = new CCS811 (CCS811_ADDR);
 //CCS811 ccs(CCS811_ADDR);
@@ -37,10 +38,22 @@ const uint8_t UUID_CHR_TVOC[] =
     0x0e, 0x42, 0x98, 0x24, 0xe1, 0xe8, 0x2f, 0x6c
 };
 
-BLECharacteristic eCO2c ;  // temperature 
-BLECharacteristic TVOCc ;  // humidity
+BLECharacteristic eCO2c ;  // equivalent CO2 
+BLECharacteristic TVOCc ;  // volatile organic compounds
 const char * CO2descr = "eCO2";
 const char * TVOCdescr = "TVOC";
+uint16_t prevCO2 = 0;
+uint16_t prevVOC = 0;
+
+float checkTrig(uint16_t val, uint16_t & prev) {
+  float chg = (float(val) - float(prev)) * 100.0 / prev;
+  Serial.print(" CCSchng%:"); Serial.println(chg);
+  if (fabs(chg) > NOTIFYPERC) {
+    prev = val;
+    return chg;
+  }
+  return 0.0;
+}
 
 bool setupCCS811(){
   Serial.print("Setup CCS811 Sensor on I2C adr:0x");Serial.println(CCS811_ADDR, HEX);
@@ -83,12 +96,12 @@ bool setupCCS811(){
   return true;
 }
 
-void pollCCS811(float temp, float hum){
+bool pollCCS811(float temp, float hum){
+  float changed = 0;
 #ifdef SPARKFUN
   if (ccs == NULL)
-     return;
+     return 0;
   if (ccs->dataAvailable()) {
-        
       if (temp>0 && hum>0 && !isnan(temp) && !isnan(hum))
           ccs->setEnvironmentalData(temp, hum);
         ccs->readAlgorithmResults(); //Calling this function updates the global tVOC and eCO2 variables
@@ -101,16 +114,20 @@ void pollCCS811(float temp, float hum){
         uint16_t TVOC = ccs.getTVOC();
 #endif
         Serial.print("eCO2:"); Serial.print(eCO2, DEC);  Serial.print(" TVOC:"); Serial.print(TVOC, DEC);
-        
         if ( Bluefruit.connected() ) {
-          if (eCO2c.notifyEnabled()) 
+          changed += checkTrig(eCO2-300, prevCO2);
+          if (eCO2c.notifyEnabled() && changed ) {
             eCO2c.notify16(eCO2);
-          else
+            Serial.println("notifying CO2");
+          } else
             eCO2c.write16(eCO2);
-          if (TVOCc.notifyEnabled()) 
+          changed += checkTrig(TVOC+20, prevVOC);
+          if (TVOCc.notifyEnabled() && changed ) {
             TVOCc.notify16(TVOC);
-          else
+            Serial.println("notifying VOC");
+          } else
             TVOCc.write16(TVOC);
         }
       }
+    return changed != 0.0;
 }

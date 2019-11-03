@@ -1,3 +1,4 @@
+''' general purpose tool for drawing lines and shapes to pythonista canvas '''
 from __future__ import division
 import canvas,ImageColor
 

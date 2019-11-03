@@ -1,4 +1,4 @@
-# Changelog fshome project
+# Changelog BLE-automation project
 
 If you notice that something is missing, please open an issue or submit a PR.
 
@@ -14,6 +14,12 @@ Sections
 ### Breaking Changes
 ### Developers
 -->
+
+## [1.1.0] - 2019-11-01
+### Added
+- rpi-AIOS-client : BLE receiver on raspberry pi using bluepy lib
+### Changed
+- Environment-server uses triggers for notification on Temp,Hum,CO2,VOC
 
 ## [1.0.1] - 2019-09-22
 ### Fixed

@@ -1,5 +1,5 @@
 # BLE-automation
-This project comprises Bluetooth GATT Automation IO server on Adafruit Feather nRF52832 device and a Pythonista Automation IO client on an IOS device.
+This project comprises Bluetooth GATT Automation IO server on Adafruit Feather nRF52832 device and a Pythonista Automation IO client on an IOS device and also an python3 Automation IO client on a raspberry pi using the bluepy library.
 
 The GATT automation-IO profile defines an Bluetooth Low Energy device with digital-analog inputs and outputs, which can be controlled remotely by clients implementing the profile. This project implements it on an iPad using python in the Pythonista App.
 
@@ -13,12 +13,32 @@ The Adafruit device has to be programmed using the Arduino IDE as described on t
 
 ## Automation client
 
+### ios-AIOS-client
+
 The Pythonista app has some very nice possibilities to build python 3 apps. Including charts and a graphical user interface, and having the cb module as an interface to Bluetooth Low Energy on the IOS platform. The doc folder shows some screenshots.
 
-I am planning to include this device in my other github project: fshome
+### rpi-AIOS-client
+
+To setup BLE (i.e. bluepy) for Python on a Raspberry pi execute the following commands:  
+  
+```bash  
+cd rpi-AIOS-client  
+git clone ....
+cd bluepy  
+pip3 install .
+or python3 setup.py develop --user   
+```
+
+### What is next
+
+I am planning to include the rpi client in my other github project: fshome
 
 ## Usage
 
+- connect the device to something usefull
+- install the server software on it
+- pick one of the clients
+- extend the clients to do something usefull
 
 ## Refered products:
 
@@ -30,6 +50,8 @@ I am planning to include this device in my other github project: fshome
 <https://github.com/adafruit/Adafruit_nRF52_Arduino>
 - The Adafruit device:
 <https://www.adafruit.com/product/3406>
+- The bleak package for BLE on a raspberry
+<https://https://github.com/hbldh/bleak>
 
 
 

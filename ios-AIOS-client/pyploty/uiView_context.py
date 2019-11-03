@@ -1,3 +1,6 @@
+''' general purpose tool for drawing lines and shapes to pythonista ui.View class '''
+
+
 import logging
 import canvas
 import ui
