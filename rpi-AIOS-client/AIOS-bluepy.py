@@ -13,9 +13,9 @@ else:
 	logger = tls.get_logger()
 
 DEVADDRESS = "d8:59:5b:cd:11:0c"
-AIOS_SVR = "00001815-0000-1000-8000-00805f9b34fb"
-ENV_SVR  = "6c2fe8e1-2498-420e-bab4-81823e7b0c03"
-DEVINF_SVR="0000180a-0000-1000-8000-00805f9b34fb"
+AIOS_SVR = "00001815-0000-1000-8000-00805f9b34fb"  # automation-IO
+ENV_SVR  = "6c2fe8e1-2498-420e-bab4-81823e7b0c03"  # environmental quantities
+DEVINF_SVR="0000180a-0000-1000-8000-00805f9b34fb"  # device info
 
 chTEMP=1
 chHUMI=2
@@ -37,7 +37,9 @@ SCALES={chTEMP:100.0, chHUMI:100.0 }
 NAMES ={chTEMP:'temperature', chHUMI:'humidity'}
 
 def CharId(uuid, CharDef=CHARS):
-	return next(chID for chID,chUUID in CharDef.items() if chUUID==uuid)
+	if uuid in CHARS.values;
+		return next(chID for chID,chUUID in CharDef.items() if chUUID==uuid)
+	return None
 
 def showChars(svr):
 	logger.info('svr %s' % svr)
@@ -47,23 +49,50 @@ def showChars(svr):
 			byts = ch.read()
 			num = int.from_bytes(byts, byteorder='little', signed=False)
 			logger.info("read %d:%s %s" % (ch.getHandle(),tls.bytes_to_hex(byts),num))
-			
+
 	
 class aiosDelegate(btle.DefaultDelegate):
-	def __init__(self, svrNotifyers=[], scales=SCALES):
+	def __init__(self, notifyers=[], scales=SCALES):
 		super().__init__()
 		self.queue = asyncio.Queue()
 		self.notifying = {}
 		self.scales=scales
-		for svr in svrNotifyers:
+		for svr in notifyers:
 			if isinstance(svr, str):
-				svr = dev.getServiceByUUID(btle.UUID(svr))
+				chId = CharId(svr)
+				if chId is None:
+					svr = dev.getServiceByUUID(btle.UUID(svr))
+				else:
+					chT = svr.getCharacteristics(CHAR[chId])
+					self.startNotification(chT)
+					continue
 			for chT in svr.getCharacteristics(): 
 				self.startNotification(chT)
 
 	def handleNotification(self, cHandle, data):
 		self.queue.put_nowait((cHandle,data))
 
+	def startServiceNotifyers(self, service):
+		for chT in service.getCharacteristics(): 
+			self.startNotification(chT)
+	def startChIdNotifyer(self, chId, dev):
+		if chId == chDIGI or chId>=chANA1ST:
+			service = dev.getServiceByUUID(btle.UUID(AIOS_SVR))
+			if not chId in CHARS:
+				descr = dev.getDescriptors()
+				hand=0
+				for des in descr:
+					if des.uuid == CHARS[chANA1ST]:
+						hand = des.handle
+						logger.info('analog chan handle %s' % hand)
+					if des.handle == hand+2:
+						chPresForm = des.read()
+		else:
+			service = dev.getServiceByUUID(btle.UUID(ENV_SVR))
+		if chId in CHARS:
+			chT = service.getCharacteristics(btle.UUID(CHAR[chId]))
+			self.startNotification(chT[0])
+			
 	def startNotification(self, charist):
 		''' sets charist on ble device to notification mode '''
 		hand = charist.getHandle()
@@ -110,7 +139,9 @@ class aiosDelegate(btle.DefaultDelegate):
 					asyncio.create_task(self.servingNotifications(dev)) ]
 	
 async def main(dev):
-	aios = aiosDelegate(svrNotifyers = [dev.getServiceByUUID(btle.UUID(ENV_SVR))])
+	aios = aiosDelegate()
+	aios.startServiceNotifyers(dev.getServiceByUUID(btle.UUID(ENV_SVR)))
+	aios.startChIdNotifyer(chDIGI)
 	dev.withDelegate( aios )
 	await asyncio.gather( * aios.tasks() )
 
