@@ -87,8 +87,8 @@ void setupAIOS(void) {
       if (isReserved(pin) == false) 	// aios skips reserved pins
         pinIO::setMode(pin, IO_NONE);
   }
-  // setup default trigger conditions
-  dig_time_trig = (time_trig_t) { 1, millis(), 5000U };  // { .condition=1, .tookms=0, .value=5s };
+  // setup default trigger conditions (at least every 5 minutes)
+  dig_time_trig = (time_trig_t) { 1, millis(), 300000U };  // { .condition=1, .tookms=0, .value=5s };
   dig_val_trig = { 0x00 };  // { .condition=0, .mask={} };  // not used
   
   for (byte pini=0; pini<nAnaChan; pini++) {

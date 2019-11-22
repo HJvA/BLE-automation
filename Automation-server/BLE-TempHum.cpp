@@ -10,6 +10,7 @@
 
 #include <bluefruit.h>
 #include "Adafruit_SHT31.h"
+#include "BLE-AIOS.h"
 
 #define UUID16_CHR_TEMPERATURE      0x2A6E
 #define UUID16_CHR_HUMIDITY         0x2A6F
@@ -23,6 +24,8 @@ BLECharacteristic sh31c ;  // humidity
 float prevTemp;
 float prevHum;
 
+time_trig_t env_time_trig;
+
 bool setupSHT31() {
   Serial.print("Setup SHT31 TempHum Sensor on I2C adr:0x");Serial.println(I2Cadr, HEX);
   sht31 = new Adafruit_SHT31(); // = Adafruit_SHT31();
@@ -33,6 +36,9 @@ bool setupSHT31() {
     sht31 = NULL;
     return false;
   }
+  // setup default trigger conditions
+  env_time_trig = (time_trig_t) { 1, millis(), 300000U };  // every 5 minutes
+  
   prevTemp = 0.0;
   prevHum = 0.0;
   st31c = BLECharacteristic(UUID16_CHR_TEMPERATURE);
@@ -45,11 +51,13 @@ bool setupSHT31() {
   //st31c.setWriteCallback(write_callback);
   //st31c.setReadCallback(read_callback);
   st31c.begin();
+  st31c.addDescriptor(DSC_time_trigger_setting, &env_time_trig, sizeof(env_time_trig), SECMODE_OPEN, SECMODE_OPEN);
 
   sh31c.setProperties(CHR_PROPS_NOTIFY | CHR_PROPS_READ);
   sh31c.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
   sh31c.setFixedLen(2); // Alternatively .setMaxLen(uint16_t len);
   sh31c.begin();
+  
   return true;
 }
 
@@ -63,16 +71,22 @@ float checkTrig(float val, float & prev) {
   return 0.0;
 }
 
-bool pollSHT31(float & temp, float & humidity) {
+bool pollSHT31(float & temp, float & humidity, ulong mstick) {
   if (sht31 == NULL)
     return false;
   temp = sht31->readTemperature();
   humidity = sht31->readHumidity();
   float changed = 0;
+  ulong trun = tdiff(env_time_trig.tookms, mstick);
+  if ( env_time_trig.condition==1 && trun>env_time_trig.tm.interv ){  // notification condition
+    changed += 10000;
+    env_time_trig.tookms = mstick;
+  }
+  
   if ( Bluefruit.connected() ) {
     if (! isnan(temp) ) {
       int16_t tmp = ROUND_2_INT(temp*100.0);
-      changed = fabs(checkTrig(temp, prevTemp));
+      changed += fabs(checkTrig(temp, prevTemp));
       if (st31c.notifyEnabled() && changed>0.0 ) {
         if ( st31c.notify16(tmp) ){
           Serial.print("temperature notified : "); Serial.print(temp);  

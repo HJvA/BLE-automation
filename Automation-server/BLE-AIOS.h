@@ -93,5 +93,6 @@ const uint8_t nDigBits = NUM_DIGITAL_PINS;
 
 extern BLEService   aios ;  // automation io severvice
 
+ulong tdiff(ulong tick1, ulong tick2);
 void setupAIOS(void);
-word pollAIOS(ulong trun);
+word pollAIOS(ulong tick);

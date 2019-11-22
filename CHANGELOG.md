@@ -15,6 +15,11 @@ Sections
 ### Developers
 -->
 
+## [1.1.1] - 2019-11-22
+### Changed
+- rpi-AIOS-client : recoverConnection when BLE connection lost
+- Automation-server : time triggers for notifying temperature,humidity,TVOC,eCO2
+
 ## [1.1.0] - 2019-11-01
 ### Added
 - rpi-AIOS-client : BLE receiver on raspberry pi using bluepy lib

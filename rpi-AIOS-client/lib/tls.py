@@ -6,12 +6,12 @@ import logging
 import os,re,sys
 import threading
 
-def bytes_to_int(data, endian='>'):
+def bytes_to_int(data, endian='>', signed=True):
 	"""Convert a bytearray into an integer, considering the first bit sign."""
 	if endian=='<':
 		data=bytearray(data)
 		data.reverse()
-	negative = data[0] & 0x80 > 0
+	negative = signed and (data[0] & 0x80 > 0)
 	if negative:
 		inverted = bytearray(~d % 256 for d in data)
 		return -bytes_to_int(inverted) - 1
@@ -137,10 +137,13 @@ def get_logger(pyfile=None, levelConsole=logging.INFO, levelLogfile=logging.DEBU
 		pyfile=None   : called by package as sub module : logger from __main__ to be used
 		pyfile=__file__ : called by main or testing module : create new logger
 	  '''
-	if pyfile is None or pyfile!=sys.modules['__main__'].__file__:
+	root = sys.modules['__main__'].__file__
+	if pyfile is None or pyfile!=root:
 		return logging.getLogger(__name__)	# get logger from main program
 	logger = logging.getLogger()
-	return set_logger(logger, pyfile, levelConsole, levelLogfile)
+	logger = set_logger(logger, pyfile, levelConsole, levelLogfile)
+	logger.critical("starting %s dd %s" % (root, time.strftime("%d %H:%M:%S", time.localtime())))
+	return logger
 
 	
 if __name__ == "__main__":

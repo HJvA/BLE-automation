@@ -1,5 +1,6 @@
 
 #include <bluefruit.h>
+
 #define SPARKFUN 1
 
 #ifdef SPARKFUN  /***************/
@@ -16,7 +17,8 @@ CCS811* ccs = new CCS811 (CCS811_ADDR);
 #include "Adafruit_CCS811.h"
 Adafruit_CCS811 ccs;
 
-#endif          /***************/
+#endif  
+#include "BLE-AIOS.h"
 
 //#define UUID_CHR_ECO2  = "6c2fe8e1-2498-420e-bab4-81823e7b7397"
 //#define UUID_CHR_TVOC  = "6c2fe8e1-2498-420e-bab4-81823e7b7398"
@@ -38,12 +40,16 @@ const uint8_t UUID_CHR_TVOC[] =
     0x0e, 0x42, 0x98, 0x24, 0xe1, 0xe8, 0x2f, 0x6c
 };
 
+
+
 BLECharacteristic eCO2c ;  // equivalent CO2 
 BLECharacteristic TVOCc ;  // volatile organic compounds
 const char * CO2descr = "eCO2";
 const char * TVOCdescr = "TVOC";
 uint16_t prevCO2 = 0;
 uint16_t prevVOC = 0;
+
+time_trig_t ccs_time_trig;
 
 float checkTrig(uint16_t val, uint16_t & prev) {
   float chg = (float(val) - float(prev)) * 100.0 / prev;
@@ -81,6 +87,10 @@ bool setupCCS811(){
   eCO2c.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
   eCO2c.setFixedLen(2); // Alternatively .setMaxLen(uint16_t len);
   eCO2c.begin();
+  eCO2c.addDescriptor(DSC_time_trigger_setting, &ccs_time_trig, sizeof(ccs_time_trig), SECMODE_OPEN, SECMODE_OPEN);
+  // setup default trigger conditions
+  ccs_time_trig = (time_trig_t) { 1, millis(), 300000U };  // every 5 minutes at least
+
   TVOCc.setUserDescriptor(CO2descr);
   // getting errors when activating the user descr ??
   //eCO2c.addDescriptor(DSC_charac_user_descr, CO2descr, 4, SECMODE_OPEN, SECMODE_NO_ACCESS);
@@ -96,7 +106,7 @@ bool setupCCS811(){
   return true;
 }
 
-bool pollCCS811(float temp, float hum){
+bool pollCCS811(float temp, float hum, ulong mstick){
   float changed = 0;
 #ifdef SPARKFUN
   if (ccs == NULL)
@@ -113,15 +123,20 @@ bool pollCCS811(float temp, float hum){
         uint16_t eCO2 = ccs.geteCO2();
         uint16_t TVOC = ccs.getTVOC();
 #endif
+        ulong trun = tdiff(ccs_time_trig.tookms, mstick);
+        if ( ccs_time_trig.condition==1 && trun>ccs_time_trig.tm.interv ){  // notification condition
+          changed += 10000;
+          ccs_time_trig.tookms = mstick;
+        }
         Serial.print("eCO2:"); Serial.print(eCO2, DEC);  Serial.print(" TVOC:"); Serial.print(TVOC, DEC);
         if ( Bluefruit.connected() ) {
-          changed += checkTrig(eCO2-300, prevCO2);
+          changed += checkTrig(eCO2-200, prevCO2);
           if (eCO2c.notifyEnabled() && changed ) {
             eCO2c.notify16(eCO2);
             Serial.println("notifying CO2");
           } else
             eCO2c.write16(eCO2);
-          changed += checkTrig(TVOC+20, prevVOC);
+          changed += checkTrig(TVOC+30, prevVOC);
           if (TVOCc.notifyEnabled() && changed ) {
             TVOCc.notify16(TVOC);
             Serial.println("notifying VOC");

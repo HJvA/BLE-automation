@@ -136,9 +136,10 @@ void loop()
   
   
 	if ( Bluefruit.connected() ) {
- 		bool changed = pollSHT31(temp, humidity);
-    changed |= pollCCS811(temp, humidity);
- 		if (pollAIOS(millis()) || changed ) {  // having trigger condition
+		ulong mstick = millis();
+ 		bool changed = pollSHT31(temp, humidity, mstick);
+    changed |= pollCCS811(temp, humidity, mstick);
+ 		if (pollAIOS(mstick) || changed ) {  // having trigger condition
       pinIO::setState(LED_RED, true);
 		  uint8_t BatPerc = pollBatteryService();
 		  Serial.print(" Temp:");Serial.print(temp, DEC); Serial.print(" Humi:");Serial.print(humidity, DEC);

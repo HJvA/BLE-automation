@@ -31,7 +31,7 @@ or python3 setup.py develop --user
 
 ### What is next
 
-I am planning to include the rpi client in my other github project: fshome
+ported to fshome project
 
 ## Usage
 
@@ -50,8 +50,8 @@ I am planning to include the rpi client in my other github project: fshome
 <https://github.com/adafruit/Adafruit_nRF52_Arduino>
 - The Adafruit device:
 <https://www.adafruit.com/product/3406>
-- The bleak package for BLE on a raspberry
-<https://https://github.com/hbldh/bleak>
+- The bluepy package for BLE on a raspberry
+<https://github.com/IanHarvey/bluepy>
 
 
 

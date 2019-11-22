@@ -7,7 +7,7 @@
 //  <Unit>org.bluetooth.unit.percentage</Unit>
 //  <DecimalExponent>-2</DecimalExponent>
 
+bool checkTrig(float val, float & prev);
 
 bool setupSHT31();
-void pollSHT31(float & temp, float & humidity);
-//void pollSHT31();
+bool pollSHT31(float & temp, float & humidity, ulong mstick);
