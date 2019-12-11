@@ -1,7 +1,7 @@
 # BLE-automation
 This project comprises Bluetooth GATT Automation IO server on Adafruit Feather nRF52832 device and a Pythonista Automation IO client on an IOS device and also an python3 Automation IO client on a raspberry pi using the bluepy library.
 
-The GATT automation-IO profile defines an Bluetooth Low Energy device with digital-analog inputs and outputs, which can be controlled remotely by clients implementing the profile. This project implements it on an iPad using python in the Pythonista App.
+The GATT automation-IO profile defines an Bluetooth Low Energy device with digital-analog inputs and outputs, which can be controlled remotely by clients implementing the profile. This project implements it on an iPad using python in the Pythonista App. Now also a client on the Raspberry pi is provided, which is used in my fshome project.
 
 As an extra, the Adafruit / Arduino software also has sensors implemented for temperature, humidity, eCO2, TVOC, using the I2C bus with the SHT31-D and the CCS811 breakout boards.
 

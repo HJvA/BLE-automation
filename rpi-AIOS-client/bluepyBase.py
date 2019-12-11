@@ -28,11 +28,15 @@ def showChars(svr):
 
 class bluepyDelegate(btle.DefaultDelegate):
 	""" handling notifications asynchronously 
-		must either be created in async co-routine or have loop connected """
+		must either be created in async co-routine or have loop supplied """
 	def __init__(self, devAddress, scales={}, loop=None):
 		super().__init__()
-		self.dev = btle.Peripheral(devAddress, btle.ADDR_TYPE_RANDOM)
-		self.dev.withDelegate( self )
+		try:
+			self.dev = btle.Peripheral(devAddress, btle.ADDR_TYPE_RANDOM)
+			self.dev.withDelegate( self )
+		except btle.BTLEDisconnectError as e:
+			logger.error('unable to connect ble device : %s' % e)
+			self.dev = None
 		self.queue = asyncio.Queue(loop=loop)
 		self.notifying = {}
 		self.scales=scales
@@ -44,8 +48,9 @@ class bluepyDelegate(btle.DefaultDelegate):
 	def startServiceNotifyers(self, service):
 		for chT in service.getCharacteristics(): 
 			self.startNotification(chT)
+	
 			
-	def CharId(self, charist):
+	def _CharId(self, charist):
 		return charist.getHandle()
 		if uuid in CHARS.values():
 			return next(chID for chID,chUUID in CharDef.items() if chUUID==uuid)
@@ -58,16 +63,13 @@ class bluepyDelegate(btle.DefaultDelegate):
 			if hand in self.notifying:
 				chId = self.notifying[hand]
 			else:
-				chId = self.CharId(charist)
+				chId = self._CharId(charist)
 				self.notifying[hand] = chId
 			charist.peripheral.writeCharacteristic(hand+1, b"\x01\x00", withResponse=True)
 			logger.info('starting notificatio on (%d) %s' % (chId,charist))
 		else:
-			logger.warning('NOTIFY not supported by:%s' % charist)
-		if charist.supportsRead():
-			val = charist.read()
-			if self.queue:
-				self.queue.put_nowait((hand,val))
+			logger.warning('NOTIFY not supported by:%s on %s' % (hand,charist))
+		val = self.read(charist)
 
 	async def receiveCharValue(self):
 		""" consume received notification data """
@@ -76,7 +78,10 @@ class bluepyDelegate(btle.DefaultDelegate):
 		if tup:
 			if tup[0] in self.notifying:
 				chId = self.notifying[tup[0]]
-			val = int.from_bytes(tup[1], 'little') #  tls.bytes_to_int(tup[1], '<', False)
+			if len(tup[1])<=4:
+				val = int.from_bytes(tup[1], 'little') #  tls.bytes_to_int(tup[1], '<', False)
+			else:
+				val = tup[1]  # keep bytes for digitals
 		else:
 			val = float('NaN')
 		if chId in self.scales:
@@ -85,12 +90,25 @@ class bluepyDelegate(btle.DefaultDelegate):
 		self.queue.task_done()
 		return chId,val
 
+	def read(self, charist):
+		''' read value from characteristic on device put result also in async queue '''
+		if charist.supportsRead():
+			val = charist.read()
+			if self.queue:
+				hand = charist.getHandle()
+				self.queue.put_nowait((hand,val))
+			return val
+			
+	def write(self, charist, data):
+		#if charist.supportsWrite():
+		charist.write(data)
+
 	async def awaitingNotifications(self):
 		""" keep consuming received notifications """
-		while True:
+		while self.dev is not None:
 			dat = await self.receiveCharValue()
 
-	async def recoverConnection(self):
+	async def _recoverConnection(self):
 		try:
 			logger.error('BLE disconnected adr:%s adrtp:%s' % (self.dev.addr,self.dev.addrType))
 			await asyncio.sleep(5)
@@ -103,22 +121,25 @@ class bluepyDelegate(btle.DefaultDelegate):
 					charist = self.dev.getCharacteristics(hnd-1,hnd)
 					if charist:
 						self.startNotification(charist[0])
-		except Exception as e:
+		except btle.BTLEDisconnectError as e:
 			logger.error("error recovering BLE connection:%s" % e)
+		except Exception as e:
+			logger.error("unrecoverable BLE error :%s" % e)
+			self.dev._helper = None
+			await asyncio.sleep(10)
 			
 	async def servingNotifications(self):
 		""" keep polling bluepy for received notifications """
-		#self.queue = asyncio.Queue(loop=loop)
-		while True:
+		while self.dev is not None:
 			try:
 				if self.dev._helper is not None:
 					if self.dev.waitForNotifications(0.1):
 						#await self.receiveCharValue()
 						pass
 				else:
-					await self.recoverConnection()
-			except btle.BTLEDisconnectError as e:
-				await self.recoverConnection()
+					await self._recoverConnection()
+			except (btle.BTLEDisconnectError, btle.BTLEInternalError) as e:
+				await self._recoverConnection()
 			await asyncio.sleep(0.1)
 		
 	def tasks(self):
@@ -135,8 +156,15 @@ if __name__ == "__main__":	# testing
 		delg = bluepyDelegate(DEVADDRESS)
 		#dev = btle.Peripheral(DEVADDRESS, btle.ADDR_TYPE_RANDOM) #  btle.ADDR_TYPE_PUBLIC)
 	
-		#logger.info('dev %s iface:%s' % (dev,dev.iface))
+		logger.info('dev %s iface:%s' % (delg.dev,delg.dev.iface))
 	
+		logger.info("Services...")
+		for svc in delg.dev.services:
+			logger.info(str(svc))
+			time.sleep(0.1)
+			showChars(svc)
+		time.sleep(5)
+		
 		descr = delg.dev.getDescriptors()
 		for des in descr:
 			try:
@@ -144,12 +172,6 @@ if __name__ == "__main__":	# testing
 			except btle.BTLEGattError as e:
 				logger.warning('%s:%s:' % (des,e ))
 		
-		logger.info("Services...")
-		for svc in delg.dev.services:
-			logger.info(str(svc))
-			time.sleep(0.1)
-			showChars(svc)
-	
 			if servNotifying:
 				for srv in servNotifying:
 					delg.startServiceNotifyers(delg.dev.getServiceByUUID(btle.UUID(srv)))
@@ -164,6 +186,6 @@ if __name__ == "__main__":	# testing
 
 	
 	logger.info("getting notified")
-	asyncio.run(main([BAS_SVR,DEVINF_SVR]))
+	asyncio.run(main([BAS_SVR]))
 	
 	logger.warning('bye')

@@ -100,6 +100,7 @@ void setup()
 	Serial.println("Bluefruit Automation IO");
 	Serial.println("\n");
 	Bluefruit.begin();
+	Bluefruit.setTxPower(4);    // Check bluefruit.h for supported values
 	Serial.println("Configuring the AIOS Service");
 	setupAIOS();
 

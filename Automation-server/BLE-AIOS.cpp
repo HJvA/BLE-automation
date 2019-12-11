@@ -88,16 +88,16 @@ void setupAIOS(void) {
         pinIO::setMode(pin, IO_NONE);
   }
   // setup default trigger conditions (at least every 5 minutes)
-  dig_time_trig = (time_trig_t) { 1, millis(), 300000U };  // { .condition=1, .tookms=0, .value=5s };
+  dig_time_trig = (time_trig_t) { ttINTERVAL, millis(), 300000U };  // { .condition=1, .tookms=0, .value=5s };
   dig_val_trig = { 0x00 };  // { .condition=0, .mask={} };  // not used
   
   for (byte pini=0; pini<nAnaChan; pini++) {
     anac[pini] = BLECharacteristic(UUID16_CHR_ANALOG);  // chracteristic for each pin
-    ana_time_trigs[pini] = { 1,0, 60000U };		// 
-    ana_val_trigs[pini] = { 3, 10000 }; // only notify when step>1V i.e. default setting
+    ana_time_trigs[pini] = { ttINTERVAL,0, 60000U };		// 
+    ana_val_trigs[pini] = { vtDEVIATES, 10000 }; // only notify when step>1V i.e. default setting
   }
   
-  Serial.print("Beginning AIOS service. LenDigBits="); Serial.print(LenDigBits, DEC); Serial.print(" nAnaChan="); Serial.println(nAnaChan,DEC);
+  Serial.print("Beginning AIOS service. LenDigBits="); Serial.print(LenDigBits, DEC); Serial.print(" bytes nAnaChan="); Serial.println(nAnaChan,DEC);
   aios.begin();
 
   // digital chracteristic
@@ -146,7 +146,7 @@ word pollAIOS(ulong tick){
 	word changed = pinIO::produceBLEdig(digdata, sizeof(digdata));
 	ulong trun = tdiff(dig_time_trig.tookms, tick);
 	if (digc.notifyEnabled()) {
-		if ( dig_time_trig.condition==1 && trun>dig_time_trig.tm.interv ){  // notification condition
+		if ( changed || (dig_time_trig.condition==ttINTERVAL && trun>dig_time_trig.tm.interv) ){  // notification condition
 			changed=1;
 			digc.notify(digdata, sizeof(digdata));
 			Serial.print("digital notified trun ms: "); Serial.println(trun, DEC); 
@@ -165,8 +165,8 @@ word pollAIOS(ulong tick){
 		uint16_t ana = takeAnaGatt(chan);  // anaIO::produceBLEana(chan);
 		if (ana < 0xfffe) {	// valid sample
 			if (anac[chan].notifyEnabled()) {
-				if ((ana_val_trigs[chan].condition==3 && ana_val_trigs[chan].lev.val<abs(ana-mvolt[chan])) ||
-					(ana_time_trigs[chan].condition==1 && trun>ana_time_trigs[chan].tm.interv)) {
+				if ((ana_val_trigs[chan].condition==vtDEVIATES && ana_val_trigs[chan].lev.val<abs(ana-mvolt[chan])) ||
+					(ana_time_trigs[chan].condition==ttINTERVAL && trun>ana_time_trigs[chan].tm.interv)) {
 					anac[chan].notify16(ana);
 					Serial.print("analog trun ms:"); Serial.print(trun, DEC);
 					Serial.print(" chan:");Serial.print(chan);Serial.print(" notified dev[V]:"); Serial.println(float(ana-mvolt[chan])/10000, DEC ); 

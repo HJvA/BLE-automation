@@ -62,6 +62,20 @@
 #define VAL_TRIG_VAL1(chan) (value_trigs[chan].value1)
 #define VAL_TRIG_VAL2(chan) (value_trigs[chan].value2)
 
+// time trigger condition
+#define ttINTERVAL 1
+#define ttMININTERVAL 2
+#define ttNRVALTRIGS 3
+
+// value trigger condition
+#define vtBOUNDPASS 1
+#define vtEQUALS 2
+#define vtDEVIATES 3
+#define vtDIFFINMASK 4
+#define vtINOUTAREA 5
+#define vtONBOUNDARY 6
+#define vtNONE 7
+
 // structures for trigger conditions
 // these struct result in condition beeing first / Big Endian
 typedef struct time_trig_t {

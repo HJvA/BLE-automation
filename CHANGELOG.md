@@ -15,6 +15,10 @@ Sections
 ### Developers
 -->
 
+## [1.1.2] - 2019-12-11
+### Changed
+- notify only on trigger conditions
+
 ## [1.1.1] - 2019-11-22
 ### Changed
 - rpi-AIOS-client : recoverConnection when BLE connection lost
