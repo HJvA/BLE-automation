@@ -101,7 +101,7 @@ void setup()
 	Serial.println("\n");
 	Bluefruit.begin();
 	Bluefruit.setTxPower(4);    // Check bluefruit.h for supported values
-	Serial.println("Configuring the AIOS Service");
+	Serial.println("Setup AIOS Service");
 	setupAIOS();
 
 	EnvironService = BLEService(BLEUuid(UUID_SVR_ENVIRON));
@@ -128,27 +128,38 @@ void setup()
   
 	pinIO::setMode(LED_RED, OUTPUT);
 	pinIO::setMode(LED_BLUE, OUTPUT);
+  delay(2000);
 }
 
+bool starting = true;
 void loop()
 {
 	float temp;
 	float humidity;
-  
-  
+  bool changed = false;
+     
 	if ( Bluefruit.connected() ) {
+    if (starting) {
+       Serial.println("starting");
+       delay(10000);
+       starting = false;
+    }
 		ulong mstick = millis();
- 		bool changed = pollSHT31(temp, humidity, mstick);
+    changed = false;
+ 		changed |= pollSHT31(temp, humidity, mstick);
     changed |= pollCCS811(temp, humidity, mstick);
- 		if (pollAIOS(mstick) || changed ) {  // having trigger condition
+    changed |= pollAIOS(mstick);
+ 		if (changed ) {  // having trigger condition
       pinIO::setState(LED_RED, true);
 		  uint8_t BatPerc = pollBatteryService();
 		  Serial.print(" Temp:");Serial.print(temp, DEC); Serial.print(" Humi:");Serial.print(humidity, DEC);
-		  Serial.print(" Bat%:");Serial.println(BatPerc);
+		  Serial.print(" Bat%:");Serial.print(BatPerc);
 	  }
-	}
+    Serial.println("  ====");
+	} else
+    starting = true;
 
 	delay(20);
 	pinIO::setState(LED_RED, false);
-	delay(1000UL);
+	delay(1000);
 }

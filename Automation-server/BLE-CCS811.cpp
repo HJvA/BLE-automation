@@ -53,8 +53,8 @@ time_trig_t ccs_time_trig;
 
 float checkTrig(uint16_t val, uint16_t & prev) {
   float chg = (float(val) - float(prev)) * 100.0 / prev;
-  Serial.print(" CCSchng%:"); Serial.println(chg);
   if (fabs(chg) > NOTIFYPERC) {
+    Serial.print(" CCSchng%:"); Serial.println(chg);
     prev = val;
     return chg;
   }

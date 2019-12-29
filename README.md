@@ -7,6 +7,10 @@ As an extra, the Adafruit / Arduino software also has sensors implemented for te
 
 ## Automation server
 
+### GATT enhancements:
+- uses writable Valid_Range descriptor to set analog reference voltage
+- uses presentation format descriptor to tag analog characteristic with channel number (0..nChans)
+
 ### Installation
 
 The Adafruit device has to be programmed using the Arduino IDE as described on the Adafruit site. The Adafruit device and the breakout sensor boards can be put together using prototyping breadboards, but the doc folder in this project shows another option when a soldering iron is available.
@@ -52,6 +56,4 @@ ported to fshome project
 <https://www.adafruit.com/product/3406>
 - The bluepy package for BLE on a raspberry
 <https://github.com/IanHarvey/bluepy>
-
-
 

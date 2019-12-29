@@ -15,7 +15,7 @@
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
-
+#include <math.h>
 #include <Arduino.h>
 #include <bluefruit.h>
 #include "pinIO.hpp"
@@ -35,7 +35,7 @@ const uint8_t ReservedPins[] = {
 //const std::vector<byte> ReservedPins = {
   0,1,           //  nc
   PIN_VBAT,      // ,31 ,A7
-  //PIN_AREF,     // ,24
+  //PIN_AREF,       // ,24
   //PIN_SERIAL_RX,  // ,8
   //PIN_SERIAL_TX,  // ,6
   //SS,         // ,18
@@ -53,59 +53,65 @@ bool isReserved(byte pin) {
   }
   return false;
 }
-
 //#define IS_RESERVED(pin) ( (std::find(std::begin(ReservedPins), std::end(ReservedPins), pin) != std::end(ReservedPins)) )
 
+#define ROUND_2_UINT(f) ((uint16_t)(f >= 0.0 ? (f + 0.5) : (f - 0.5)))
+
+eAnalogReference ADCREFMODES[NREFS] {
+    AR_INTERNAL_1_2,
+    AR_INTERNAL_1_8,
+    AR_INTERNAL_2_4,
+    AR_INTERNAL_3_0,
+    AR_INTERNAL,
+    AR_VDD4
+};
+word mVREF[NREFS] = {
+    1200,
+    1800,
+    2400,
+    3000,
+    3600,
+    5000
+};
+
+// ****** binary IO bits *********
 byte pinIO::nPins;
 pinIO * pinIO::pins; // required to repeat it ? by cpp
+// create all bits, mapping bitidx 1:1 to pin
 void pinIO::createDigBits(byte nBits)
 {
   Serial.print("Setting up digital IO nr:"); Serial.println(nBits, DEC); 
   pins = new pinIO[nBits];
-  for (byte pin=0; pin<nBits; pin++) {
-    pins[pin].pin = (pin); //DIGIT_TO_PIN(pin);
-    pins[pin].mode = IO_NONE;
+  for (byte iBit=0; iBit<nBits; iBit++) {
+    pins[iBit].pin = (iBit); //DIGIT_TO_PIN(pin);
+    pins[iBit].mode = IO_NONE;
   }
   pinIO::nPins = nBits;
 }
+// T : possible digital pin
 bool pinIO::isDigital(byte pin) {
-  for (byte p=0; p<nPins; p++)
-     if (pin == pins[p].pin)
+  for (byte iBit=0; iBit<nPins; iBit++)
+     if (pin == pins[iBit].pin)
         return true;
   return false;
 }
 
-byte anaIO::nChans;
-anaIO * anaIO::anachan;
-void anaIO::createAnaPins(byte nPins)
-{
-  Serial.print("Setting up analog IO nr:"); Serial.println(nPins, DEC); 
-  anachan = new anaIO [nPins];
-  for (byte ach=0; ach<nPins; ach++) {
-    anachan[ach].pin = (ANALOG_TO_PIN[ach]); 
-    anachan[ach].mode = IO_NONE;
-    anachan[ach].anaval = 0xffff;
-  }
-  nChans=nPins;
-}
-bool anaIO::isAnalog(byte pin) {
-  for (byte p=0; p<nChans; p++)
-     if (pin == anachan[p].pin && anachan[p].mode != IO_NONE)
-        return true;
-  return false;
-}
-
-// set pin mode to a digital (binary) pin (see pinIO.hpp)
-void pinIO::setMode(byte mode) {
+// set pin mode to a digital (binary) pin (see pinIO.hpp) returns success
+bool pinIO::setMode(byte mode) {
   if (this->mode != mode) {
    if (mode == IO_NONE) {
      Serial.print("disable dig mode on pin ");Serial.println(pin, DEC); 
      this->mode = mode;
    }
    else if (anaIO::isAnalog(pin)) {
-     Serial.print("isAnalog pin ");Serial.println(pin, DEC); 
+     Serial.println("ana pin can not be dig !! ");Serial.println(pin, DEC); 
+     return false;
    } else {
-   Serial.print("changing dig mode on pin ");Serial.print(pin, DEC);Serial.print(" to:"); Serial.print(mode, DEC); Serial.println(PINMODE(mode)); 
+   Serial.print("changing dig mode on pin ");Serial.print(pin, DEC);Serial.print(" to: "); Serial.println(PINMODE(mode)); 
+   if (isReserved(pin) || !isDigital(pin)) {
+     Serial.println("not allowed !!");
+     return false;
+   }
    switch (mode) {
     //case PIN_MODE_PWM:
     //  digitalWrite((pin), LOW);  // disable pullup
@@ -125,16 +131,59 @@ void pinIO::setMode(byte mode) {
       break;
     default:
       Serial.println("...Unknown pin mode.");
-      break;
+      return false;
     }
    }
   }
+  return true;
+}
+
+// set pin value to bit
+void pinIO::setState(bool bitv) {
+  //if (IS_PIN_DIGITAL(pin))
+    if (mode == OUTPUT) {  
+      #ifdef DEBUG
+      if (this->bitv != bitv)  // first time?
+        Serial.print("Setting bit of pin:"); Serial.print(pin, DEC);Serial.print(" to:"); Serial.println(bitv, DEC);
+      #endif
+      digitalWrite(pin, bitv);
+      this->bitv = bitv;
+    }
+}
+
+// ******* analog input channels *********
+byte anaIO::nChans;
+anaIO * anaIO::anachans;
+void anaIO::createAnaPins(byte nPins)
+{
+  Serial.print("Setting up analog IO nr:"); Serial.println(nPins, DEC); 
+  anachans = new anaIO [nPins];
+  for (byte ach=0; ach<nPins; ach++) {
+    anachans[ach].pin = (ANALOG_TO_PIN[ach]); 
+    anachans[ach].mode = IO_NONE;  // not active by default
+    anachans[ach].anaval = 0xffff;
+    anachans[ach].reference = refADC::v36;
+    anachans[ach].resolution = 10;
+  }
+  nChans=nPins;
+}
+
+// T for active analog pin
+bool anaIO::isAnalog(byte pin) {
+  for (byte p=0; p<nChans; p++)
+     if (pin == anachans[p].pin && anachans[p].mode != IO_NONE)
+        return true;
+  return false;
 }
 
 // set pin mode to analog channel
-void anaIO::setMode(byte mode) {
+bool anaIO::setMode(byte mode) {
   if (this->mode != mode) {
    Serial.print("changing ana mode on pin ");Serial.print(pin, DEC);Serial.print(" to:"); Serial.print(mode, DEC); Serial.println(PINMODE(mode)); 
+   if (isReserved(pin)) {
+     Serial.println("mode not allowed on pin !! : ");
+     return false;
+   }
    switch (mode) {
     //case PIN_MODE_PWM:
     //  digitalWrite(pin, LOW);  // disable pullup
@@ -149,51 +198,98 @@ void anaIO::setMode(byte mode) {
       break;
     default:
       Serial.println("..Unknown pin mode ");
-      break;
+      return false;;
    }
   }
+  return true;
 }
-// set pin value to bit
-void pinIO::setState(bool bitv) {
-  //if (IS_PIN_DIGITAL(pin))
-    if (mode == OUTPUT) {  
-      #ifdef DEBUG
-      if (this->bitv != bitv)  // first time?
-        Serial.print("Setting bit of pin:"); Serial.print(pin, DEC);Serial.print(" to:"); Serial.println(bitv, DEC);
-      #endif
-      digitalWrite(pin, bitv);
-      this->bitv = bitv;
-    }
-}
-word anaIO::getAnaState() {
+
+uint16_t anaIO::getAnaState() {
   if (mode == INPUT_ANALOG || mode == INPUT_PULLUP)
      anaval = analogRead(pin);
   return anaval;
 }
-void anaIO::setAnaState(word value) {
+void anaIO::setAnaState(uint16_t value) {
   if (mode == OUTPUT_ANALOG)
-     analogWrite((pin), value);  // however ... no an out pins
+     analogWrite((pin), value);  // however ... no analog out pins
+}
+bool anaIO::setReference(word mVref ) {
+	bool chg = false;
+	if (setMode(INPUT_ANALOG)) { 
+		word ref;
+		for (ref=0; ref<NREFS && mVREF[ref]<mVref; ref++) {}
+		chg = (ref<NREFS && reference != (refADC)ref);
+		if (chg){
+      Serial.print("set ana reference on pin:");Serial.print(pin);Serial.print(" lev:");Serial.println(ref);
+			analogReference(ADCREFMODES[ref]); 
+			reference=(refADC)ref;
+		}
+	}
+	return chg;
+}
+void anaIO::setResolution(byte nbits) {
+	resolution = nbits;
+	analogReadResolution(nbits);
+}
+float anaIO::maxVoltRange() {
+  return float(mVREF[(int)reference])/1000.0;
 }
 
+float anaIO::getVoltage() {
+	word anas = getAnaState();
+	if (anas < 0xfff0){
+    float refV = maxVoltRange();
+    word cnts = 1 << resolution;
+		return anas*refV/cnts;
+	}
+	return NAN;
+}
+
+word volt2anaDat(float volt, uint16_t scale) {
+  return ROUND_2_UINT( volt*scale );  //exponent -4 => 10000 as specified in descriptor
+}
+float anaDat2volt(uint16_t anaDat, uint16_t scale) {
+  if (anaDat<0xfff0)
+    return  float(anaDat)/scale ;  //exponent -4 => 10000 as specified in descriptor
+  return NAN;
+}
+
+// produce analog data for aios client
+//
+uint16_t anaIO::produceBLEana(byte chan, uint16_t scale) {
+  if (chan >= nChans)
+    return 0xfffc;  
+  if (isReserved(anachans[chan].pin))
+    return 0xfffd;
+  
+  if (anachans[chan].mode == IO_NONE) {
+    //  setMode(chan, INPUT_ANALOG);
+    //Serial.print(chan,DEC);Serial.println(' ana not set to input');
+    return 0xfffb;  //anachan[chan].anaval;
+  }
+  float newval = anachans[chan].getVoltage();  //getAnaState();
+  if (isnan(newval))
+    return 0xfffa;
+  return volt2anaDat(newval, scale);
+}
 // accept bledat data from AIOS client 
 bool pinIO::acceptBLEdig(uint8_t * bledat, uint8_t len){
   word changed = 0;
-  for (uint8_t pini=0; pini<nPins && (pini >> 2)<len; pini++) {
-      byte bit2 = (bledat[pini >>2] >> ((pini & 3)*2)) & 3;
+  for (uint8_t iBit=0; iBit<nPins && (iBit >> 2)<len; iBit++) {
+      byte bit2 = (bledat[iBit >>2] >> ((iBit & 3)*2)) & 3;
       if (bit2 == 3){ 			// the unknown dig state
-         Serial.print("ignoring pin:"); Serial.println(pins[pini].pin, DEC);
-      } else if (isReserved(pins[pini].pin)) {
-         Serial.print("rejected: RESERVED pin:"); Serial.println(pins[pini].pin, DEC);
+         Serial.print("ignoring pin:"); Serial.println(pins[iBit].pin, DEC);
+      } else if (isReserved(pins[iBit].pin)) {
+         Serial.print("rejected: RESERVED pin:"); Serial.println(pins[iBit].pin, DEC);
       } else if (bit2 == 2) {	// defines the tri-state state
-      	setMode(pini, INPUT_PULLUP);  //INPUT);
-      	Serial.print("setting pin to input :"); Serial.println(pins[pini].pin, DEC);
-      } else {
-      	setMode(pini, OUTPUT);
+      	setMode(iBit, INPUT_PULLUP);  //INPUT);
+      	Serial.print("setting pin to input :"); Serial.println(pins[iBit].pin, DEC);
+      } else if (setMode(iBit, OUTPUT)) {
       	//Serial.print("setting pin to output :"); Serial.println(pins[pini].pin, DEC);
       	bool bv = bit2 & 1;
-      	if (getState(pini) != bv) {
-      		setState(pini, bv);
-      		changed++;
+      	if (getState(iBit) != bv) {
+      		setState(iBit, bv);
+     			changed++;
       	}
       }
    }
@@ -205,40 +301,22 @@ word pinIO::produceBLEdig(uint8_t * bledat, uint8_t len){
   //byte cmp[nPins >> 2 + 1];
   word changed = 0;
   memset(bledat,0,len);
-  for (uint8_t pini=0; pini<nPins; pini++) {
+  for (uint8_t iBit=0; iBit<nPins; iBit++) {
      bool bitv;
-     if (pins[pini].mode == INPUT || pins[pini].mode == INPUT_PULLUP) {
-       bitv = digitalRead(pins[pini].pin);
-       if (pins[pini].bitv != bitv)
+     if (pins[iBit].mode == INPUT || pins[iBit].mode == INPUT_PULLUP) {
+       bitv = digitalRead(pins[iBit].pin);
+       if (pins[iBit].bitv != bitv)
        	changed++;
-       pins[pini].bitv = bitv;
-       bledat[pini >> 2] |= 2 << ((pini & 3)*2);  // set input mode
-     }else if(pins[pini].mode == OUTPUT){
-       bitv = pins[pini].bitv;
-     //}else if (pins[pini].mode == INPUT_ANALOG){
+       pins[iBit].bitv = bitv;
+       bledat[iBit >> 2] |= 2 << ((iBit & 3)*2);  // set input mode
+     }else if(pins[iBit].mode == OUTPUT){
+       bitv = pins[iBit].bitv;
+     //}else if (pins[iBit].mode == INPUT_ANALOG){
      }else{
        bitv = true;
-       bledat[pini >> 2] |= 2 << ((pini & 3)*2);  // set tristate mode
+       bledat[iBit >> 2] |= 2 << ((iBit & 3)*2);  // set tristate mode
      }
-     bledat[pini >> 2] |= (bitv ? 1 : 0) << ((pini & 3)*2);
+     bledat[iBit >> 2] |= (bitv ? 1 : 0) << ((iBit & 3)*2);
   }
   return changed;
-}
-
-// produce analog data for aios client
-//
-word anaIO::produceBLEana(byte chan){
-  if (chan >= nChans)
-    return 0xfffc;
-  if (isReserved(anachan[chan].pin))
-    return 0xfffd;
-  if (anachan[chan].mode == IO_NONE) {
-    //  setMode(chan, INPUT_ANALOG);
-    Serial.print(chan,DEC);Serial.println(' ana not set to input');
-    return anachan[chan].anaval;
-  }
-  word newval = anachan[chan].getAnaState();
-  //if (oldval == newval)
-  //		return 0xffff;
-  return newval;
 }

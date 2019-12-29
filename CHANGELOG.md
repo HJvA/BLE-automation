@@ -14,6 +14,11 @@ Sections
 ### Breaking Changes
 ### Developers
 -->
+## [1.2.0] - 2019-12-29
+### Added
+- Valid_Range descriptor for analog characteristic writable, and sets reference voltage
+### Changed
+- anaCharacteristic subclass frm BLEcharacteristic
 
 ## [1.1.2] - 2019-12-11
 ### Changed

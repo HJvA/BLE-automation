@@ -6,15 +6,11 @@ import time
 import asyncio
 from bluepy import btle
 
-if __name__ == "__main__":
-	import logging
-	logger = logging.getLogger()
-else:
-	import lib.tls as tls
-	logger = tls.get_logger()
+import logging
+logger = logging.getLogger(__name__)
 
-DEVINF_SVR="0000180a-0000-1000-8000-00805f9b34fb"  # device info
-BAS_SVR   ="0000180f-0000-1000-8000-00805f9b34fb"		# battery level
+DEVINF_SVR= "180a"  #"0000180a-0000-1000-8000-00805f9b34fb"  # device info
+BAS_SVR   = "180f"  #"0000180f-0000-1000-8000-00805f9b34fb"  # battery level
 
 def showChars(svr):
 	''' lists all characteristics from a service '''
@@ -40,7 +36,7 @@ class bluepyDelegate(btle.DefaultDelegate):
 		self.queue = asyncio.Queue(loop=loop)
 		self.notifying = {}
 		self.scales=scales
-		
+
 	def handleNotification(self, cHandle, data):
 		""" callback getting notified by bluepy """
 		self.queue.put_nowait((cHandle,data))
@@ -48,13 +44,10 @@ class bluepyDelegate(btle.DefaultDelegate):
 	def startServiceNotifyers(self, service):
 		for chT in service.getCharacteristics(): 
 			self.startNotification(chT)
-	
-			
+
 	def _CharId(self, charist):
+		""" virtual """
 		return charist.getHandle()
-		if uuid in CHARS.values():
-			return next(chID for chID,chUUID in CharDef.items() if chUUID==uuid)
-		return None
 
 	def startNotification(self, charist):
 		''' sets charist on ble device to notification mode '''
@@ -65,7 +58,7 @@ class bluepyDelegate(btle.DefaultDelegate):
 			else:
 				chId = self._CharId(charist)
 				self.notifying[hand] = chId
-			charist.peripheral.writeCharacteristic(hand+1, b"\x01\x00", withResponse=True)
+			charist.peripheral.writeCharacteristic(hand+1, b"\x01\x00", withResponse=True) # cccd on hand+1
 			logger.info('starting notificatio on (%d) %s' % (chId,charist))
 		else:
 			logger.warning('NOTIFY not supported by:%s on %s' % (hand,charist))
@@ -149,14 +142,17 @@ class bluepyDelegate(btle.DefaultDelegate):
 	
 
 if __name__ == "__main__":	# testing 
+	logger.setLevel(logging.DEBUG)
 	DEVADDRESS = "d8:59:5b:cd:11:0c"
 	
 	async def main(servNotifying):
 		logger.info("Connecting...")
 		delg = bluepyDelegate(DEVADDRESS)
 		#dev = btle.Peripheral(DEVADDRESS, btle.ADDR_TYPE_RANDOM) #  btle.ADDR_TYPE_PUBLIC)
-	
-		logger.info('dev %s iface:%s' % (delg.dev,delg.dev.iface))
+		if not delg or not delg.dev:
+			logger.warning("unexpectedly leaving")
+			return
+		logger.info('dev %s iface:%s' % (delg.dev,delg.dev.iface) )
 	
 		logger.info("Services...")
 		for svc in delg.dev.services:

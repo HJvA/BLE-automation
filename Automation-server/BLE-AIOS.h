@@ -20,6 +20,7 @@
 
 /* https://www.bluetooth.com/specifications/gatt/descriptors/ */
 #define DSC_number_of_digitals        0x2909
+#define DSC_valid_range               0x2906
 
 // time_trigger_setting :  The value of the descriptor has two parts. Part one is a condition field and occupies one octet, and part two is the comparison value (trigger point) that the characteristic value is checked against.  
 //  <InformativeText>Available Conditions</InformativeText>
@@ -76,6 +77,7 @@
 #define vtONBOUNDARY 6
 #define vtNONE 7
 
+
 // structures for trigger conditions
 // these struct result in condition beeing first / Big Endian
 typedef struct time_trig_t {
@@ -98,14 +100,32 @@ typedef struct ana_val_trig_t {
 		uint16_t vals[2];
 	} lev;
 	} ana_val_trig_t;
+typedef struct ana_valid_range_t {
+  uint16_t Lower_inclusive_value;
+  uint16_t Upper_inclusive_value;
+} ana_valid_range_t;
+
+class anaCharacteristic : public BLECharacteristic
+{
+  public:
+    byte anachan;
+    anaCharacteristic();
+    anaCharacteristic(BLEUuid bleuuid, uint8_t chan);
+    
+    void updateVoltRange(void);
+    void addDescriptors(void);
+  protected:
+    uint16_t valrngHandle;
+};
 
 const uint8_t nAnaChan = 7;  // NUM_ANALOG_INPUTS-1; //TOTAL_ANALOG_PINS;  leave out Battery channel
 
 const uint8_t nDigBits = NUM_DIGITAL_PINS; 
 
+// nr of bytes required to store dig io bits i.e. 4 per byte
 #define LenDigBits ((nDigBits >> 2) + ((nDigBits &3) ? 1 : 0))
 
-extern BLEService   aios ;  // automation io severvice
+extern BLEService   aios ;  // automation io service
 
 ulong tdiff(ulong tick1, ulong tick2);
 void setupAIOS(void);

@@ -63,8 +63,8 @@ bool setupSHT31() {
 
 float checkTrig(float val, float & prev) {
   float chg = (val - prev) * 100.0 / prev;
-  Serial.print(" THchange%:"); Serial.println(chg);
   if (fabs(chg) > NOTIFYPERC) {
+    Serial.print(" THchange%:"); Serial.println(chg);
     prev = val;
     return chg;
   }
@@ -96,7 +96,7 @@ bool pollSHT31(float & temp, float & humidity, ulong mstick) {
         }
       }else{  // not notifying
         st31c.write16(tmp);
-        Serial.print("wrote temperature : "); Serial.println(temp); 
+        Serial.print(" temperature:"); Serial.print(temp); 
       }
     }
     if (! isnan(humidity) ) {
@@ -113,7 +113,7 @@ bool pollSHT31(float & temp, float & humidity, ulong mstick) {
         }
        }else{
           sh31c.write16(hum);
-          Serial.print("humidity written : "); Serial.println(humidity); 
+          Serial.print(" humidity:"); Serial.print(humidity); 
        }
     }
   }
