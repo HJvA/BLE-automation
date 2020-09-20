@@ -10,6 +10,8 @@ As an extra, the Adafruit / Arduino software also has sensors implemented for te
 ### GATT enhancements:
 - uses writable Valid_Range descriptor to set analog reference voltage
 - uses presentation format descriptor to tag analog characteristic with channel number (0..nChans)
+- activates analog input channel when notification is requested for it
+- sets digital bit to output when client writes to it
 
 ### Installation
 

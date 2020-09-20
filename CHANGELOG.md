@@ -13,7 +13,11 @@ Sections
 ### Fixed
 ### Breaking Changes
 ### Developers
--->
+--> 
+## [1.2.1] - 2020-09-25
+### Added
+- Arduino Nano 33 BLE added as test version
+
 ## [1.2.0] - 2019-12-29
 ### Added
 - Valid_Range descriptor for analog characteristic writable, and sets reference voltage

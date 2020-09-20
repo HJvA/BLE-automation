@@ -20,9 +20,7 @@
 #include "BLE-AIOS.h"
 
 #define ROUND_2_UINT(f) ((uint16_t)(f >= 0.0 ? (f + 0.5) : (f - 0.5)))
-//#define TIME_TRIG_COND (dig_time_trig & 0xf)   // little Endian?
-//#define TIME_TRIG_VAL  (dig_time_trig >> 8)    // 
-#define anaSCL 10000
+#define anaSCALE 10000	// exponent -4 in PresentationFormatDescriptor => 10000
 
 // structures for trigger conditions
 time_trig_t ana_time_trigs[nAnaChan];
@@ -32,13 +30,13 @@ time_trig_t dig_time_trig;
 //uint32_t dig_time_trig; // = 0x00000501;  // { .condition=1, .value=5 };
 dig_val_trig_t dig_val_trig; // = { 0 };
 
+// subclass BLECharacteristic 
 anaCharacteristic::anaCharacteristic() : BLECharacteristic(){}
-anaCharacteristic::anaCharacteristic(BLEUuid bleuuid, uint8_t chan) : BLECharacteristic(bleuuid)
+anaCharacteristic::anaCharacteristic(BLEUuid bleuuid, uint8_t chan) : BLECharacteristic(bleuuid) 
 {
-		
     anachan = chan; 
 }
-// this one returning handle
+// override : this one returning handle
 uint16_t add_Descriptor(BLEUuid bleuuid, void const * content, uint16_t len, BleSecurityMode read_perm, BleSecurityMode write_perm)
 {
   // Meta Data
@@ -65,33 +63,33 @@ uint16_t add_Descriptor(BLEUuid bleuuid, void const * content, uint16_t len, Ble
   sd_ble_gatts_descriptor_add(BLE_GATT_HANDLE_INVALID, &desc, &hdl);
   return hdl;
 }
+// add GATT descriptors for analog channel, storing their handles
 void anaCharacteristic::addDescriptors(void){
-    char buf [5];
-    sprintf(buf, "ch%d", anachan);
-    setUserDescriptor(buf); // alternative to recognise indiv chans
-    add_Descriptor(DSC_value_trigger_setting, &ana_val_trigs[anachan], sizeof(ana_val_trig_t),
+	char buf [5];
+	sprintf(buf, "ch%d", anachan);
+	setUserDescriptor(buf); // alternative to recognise indiv chans
+	add_Descriptor(DSC_value_trigger_setting, &ana_val_trigs[anachan], sizeof(ana_val_trig_t),
 		  SECMODE_OPEN, SECMODE_OPEN); // only 1 setting supported now
 			
-    ana_valid_range_t ana_valid_range = { 0, volt2anaDat(anaIO::maxVoltRange(anachan), anaSCL) };
-    //uint32_t, sd_ble_gatts_descriptor_add(uint16_t char_handle, ble_gatts_attr_t const *p_attr, uint16_t *p_handle));
-    valrngHandle = add_Descriptor(DSC_valid_range, &ana_valid_range, sizeof(ana_valid_range_t),
+	ana_valid_range_t ana_valid_range = { 0, volt2anaDat(anaIO::maxVoltRange(anachan), anaSCALE) };
+	valrngHandle = add_Descriptor(DSC_valid_range, &ana_valid_range, sizeof(ana_valid_range_t),
 		  SECMODE_OPEN, SECMODE_OPEN); // also writable here !
     //Serial.print("chan "); Serial.println(_format_desc.desc);
 }
+// checks GATT valid range descriptor to set analog reference voltage
 void anaCharacteristic::updateVoltRange(void) {
 	ana_valid_range_t ana_valid_range;
 	ble_gatts_value_t value =
-  	{
-      .len     = sizeof(ana_valid_range_t),
-      .offset  = 0,
-      .p_value = (uint8_t*) &ana_valid_range
- 		};
-
-  // conn handle only needed for system attribute
-  sd_ble_gatts_value_get(BLE_CONN_HANDLE_INVALID, valrngHandle, &value);
+	{
+		.len     = sizeof(ana_valid_range_t),
+		.offset  = 0,
+		.p_value = (uint8_t*) &ana_valid_range
+	};
+	// conn handle only needed for system attribute
+	sd_ble_gatts_value_get(BLE_CONN_HANDLE_INVALID, valrngHandle, &value);
 	
-	anaIO::setReference(anachan, ana_valid_range.Upper_inclusive_value /(anaSCL/1000));  
-  Serial.print("set VoltRng on:");Serial.print(anachan); Serial.print(" to [mV]:"); Serial.println(ana_valid_range.Upper_inclusive_value /(anaSCL/1000));
+	anaIO::setReference(anachan, ana_valid_range.Upper_inclusive_value /(anaSCALE/1000));  
+	Serial.print("set VoltRng on:");Serial.print(anachan); Serial.print(" to [mV]:");  Serial.println(ana_valid_range.Upper_inclusive_value /(anaSCALE/1000));
 }
 
 BLEService   aios ;  // automation io severvice
@@ -110,7 +108,7 @@ void write_callback(short unsigned int conn_hdl, BLECharacteristic* chr, uint8_t
     ana_valid_range_t * vrrec =(ana_valid_range_t *)datbuf;
     Serial.println(vrrec->Upper_inclusive_value);
     byte chIdx = vrrec->Lower_inclusive_value;  // misusing this for fetching channel
-    anaIO::setReference(chIdx , vrrec->Upper_inclusive_value /(anaSCL/1000));
+    anaIO::setReference(chIdx , vrrec->Upper_inclusive_value /(anaSCALE/1000));
     //Serial.print(chr->_format_desc);
    }else{
     Serial.print("unknown received: ");
@@ -118,6 +116,8 @@ void write_callback(short unsigned int conn_hdl, BLECharacteristic* chr, uint8_t
 }
 
 // event handler Client Characteristic Configuration Descriptor updated
+// activates analog channel when notification is requested for it
+// also calls updateVoltRange then
 void cccd_callback(uint16_t conn_hdl, BLECharacteristic* chr, uint16_t cccd_value)
 {
     Serial.print("CCCD Updated val=");
@@ -127,14 +127,13 @@ void cccd_callback(uint16_t conn_hdl, BLECharacteristic* chr, uint16_t cccd_valu
 
     if (chr->uuid == digc.uuid)
        Serial.println("Digital notifying ?");
-    if (chr->uuid == anac[0].uuid) {  // starting notification on anachan
+    if (chr->uuid == anac[0].uuid) {  // starting notification on an anachan
          //anaCharacteristic * ana = dynamic_cast<anaCharacteristic *>(chr);
-         anaCharacteristic * ana = (anaCharacteristic *) chr;
+         anaCharacteristic * ana = (anaCharacteristic *) chr;  // cast to derived class
          byte ch = ana->anachan;  
          if (anaIO::setMode(ch, INPUT_ANALOG))  // activate the channel
            delay(100);
-
-				 anac[ch].updateVoltRange();
+         anac[ch].updateVoltRange();
         if (chr->notifyEnabled(conn_hdl)) {
             Serial.print("enabling");
         } else {
@@ -172,7 +171,7 @@ void setupAIOS(void) {
   for (byte pini=0; pini<nAnaChan; pini++) {
     anac[pini] = anaCharacteristic(UUID16_CHR_ANALOG, pini);  // chracteristic for each pin
     ana_time_trigs[pini] = { ttINTERVAL,0, 60000U };		// 
-    ana_val_trigs[pini] = { vtDEVIATES, 1*anaSCL }; // only notify when step>1V i.e. default setting
+    ana_val_trigs[pini] = { vtDEVIATES, 1*anaSCALE }; // only notify when step>1V i.e. default setting
   }
   
   Serial.print("Beginning AIOS service. LenDigBits="); Serial.print(LenDigBits, DEC); Serial.print(" bytes nAnaChan="); Serial.println(nAnaChan,DEC);
@@ -187,13 +186,13 @@ void setupAIOS(void) {
   digc.begin();
   digc.addDescriptor(DSC_number_of_digitals, &nDigBits, sizeof(nDigBits), SECMODE_OPEN, SECMODE_NO_ACCESS);  // reserved bits and analog pins still have to subtracted
   digc.addDescriptor(DSC_time_trigger_setting, &dig_time_trig, sizeof(dig_time_trig), SECMODE_OPEN, SECMODE_OPEN);
- 
+  
   // analog chracteristics
   for (int ch=0; ch<nAnaChan; ch++) {
     anac[ch].setProperties(CHR_PROPS_NOTIFY | CHR_PROPS_READ);
     anac[ch].setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
     anac[ch].setFixedLen(2);
-		anac[ch].setWriteCallback(write_callback);
+    anac[ch].setWriteCallback(write_callback);
     anac[ch].setCccdWriteCallback(cccd_callback);
     // (uint8_t type , int8_t exponent, uint16_t unit, uint8_t name_space, uint16_t descritpor);
     // NOTE also used to recognise individual channels
@@ -201,17 +200,23 @@ void setupAIOS(void) {
     anac[ch].begin();
     anac[ch].addDescriptors();
   }
+  
+  byte digdata[LenDigBits];
+  pinIO::produceBLEdig(digdata, sizeof(digdata));
+  digc.write(digdata, sizeof(digdata));
+ 
   //Serial.println("AIOS service been setup, starting to poll");
 }
 
 uint16_t takeAnaGatt(int chan) {
-	uint16_t ana = anaIO::produceBLEana(chan, anaSCL);
+	uint16_t ana = anaIO::produceBLEana(chan, anaSCALE);
 	return ana;
 }
 
 uint16_t mvolt[nAnaChan]; // stores latest analog values
 
 // arduino keeps calling this when contacted
+// check whether trigger condition is met, if so send notification otherwise just update the chracteristic value
 word pollAIOS(ulong tick){
 	byte digdata[LenDigBits];
 	word changed = pinIO::produceBLEdig(digdata, sizeof(digdata));
@@ -236,7 +241,7 @@ word pollAIOS(ulong tick){
 		uint16_t ana = takeAnaGatt(chan);  // anaIO::produceBLEana(chan);
 		if (ana < 0xfff0) {	// valid sample
 			if (anac[chan].notifyEnabled()) {
-        Serial.print(" analog chan:");Serial.print(chan);
+				Serial.print(" analog chan:");Serial.print(chan);
 				if ((ana_val_trigs[chan].condition==vtDEVIATES && ana_val_trigs[chan].lev.val<abs(ana-mvolt[chan])) ||
 					(ana_time_trigs[chan].condition==ttINTERVAL && trun>ana_time_trigs[chan].tm.interv)) {
 					anac[chan].notify16(ana);
@@ -247,9 +252,9 @@ word pollAIOS(ulong tick){
 					changed++;
 				} else {
 					anac[chan].write16(ana);
-          Serial.print(" [V]:");  
+					Serial.print(" [V]:");  
 				}
-        Serial.print(float(ana)/anaSCL, DEC );
+				Serial.print(float(ana)/anaSCALE, DEC );
 			} else if (anaIO::getMode(chan) == INPUT_ANALOG) {
 				uint16_t ana = takeAnaGatt(chan);
 				if (ana < 0xfff0) {	// valid sample

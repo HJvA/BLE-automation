@@ -17,7 +17,7 @@
 */
 #include <math.h>
 #include <Arduino.h>
-#include <bluefruit.h>
+//#include <bluefruit.h>
 #include "pinIO.hpp"
 
 const char* PIN_MODE_NAMES[6] = {"input","output","pullup","pulldown","analogIn","analogOut"};
@@ -35,14 +35,16 @@ const char* PIN_MODE_NAMES[6] = {"input","output","pullup","pulldown","analogIn"
 // reserved pins on adafruit feather device
 const uint8_t ReservedPins[] = {
   0,1,           //  nc
+  #ifdef BLUEFRUIT_H_
   PIN_VBAT,      // ,31 ,A7
+  #endif
   //PIN_AREF,       // ,24
   //PIN_SERIAL_RX,  // ,8
   //PIN_SERIAL_TX,  // ,6
   //SS,         // ,18
   PIN_SPI_MISO, // ,14
   PIN_SPI_MOSI, // ,13
-  PIN_SPI_SCK,    // ,12
+  //PIN_SPI_SCK,    // ,12
   PIN_WIRE_SDA, // ,25
   PIN_WIRE_SCL, // ,26
   0xff
@@ -59,7 +61,8 @@ bool isReserved(byte pin) {
 
 #define ROUND_2_UINT(f) ((uint16_t)(f >= 0.0 ? (f + 0.5) : (f - 0.5)))
 
-#ifdef BLUEFRUIT_H_
+
+#if BLUEFRUIT_H_
 eAnalogReference ADCREFMODES[NREFS] {
     AR_INTERNAL_1_2,
     AR_INTERNAL_1_8,
@@ -67,8 +70,8 @@ eAnalogReference ADCREFMODES[NREFS] {
     AR_INTERNAL_3_0,
     AR_INTERNAL,
     AR_VDD4
-};
-#endif
+ };
+
 word mVREF[NREFS] = {  // reference voltages for analog inp
     1200,
     1800,
@@ -77,6 +80,12 @@ word mVREF[NREFS] = {  // reference voltages for analog inp
     3600,
     5000
 };
+#else 
+//const byte LED_RED = LED_BUILTIN;
+//#define LED_RED LED_PWR
+//LED_BUILTIN
+#endif
+
 
 // ****** binary IO bits (pinIO class) *********
 byte pinIO::nPins;
@@ -113,7 +122,7 @@ bool pinIO::setMode(byte mode) {
    } else {
      Serial.print("changing dig mode on pin ");Serial.print(pin, DEC);Serial.print(" to: "); Serial.println(PINMODE(mode)); 
      if (isReserved(pin) || !isDigital(pin)) {
-       Serial.println("not allowed !!");
+       Serial.print("not allowed !! for pin:");Serial.println(pin);
        return false;
      }
      switch (mode) {
@@ -169,6 +178,9 @@ void anaIO::createAnaPins(byte nPins)
     anachans[ach].anaval = 0xffff;
     anachans[ach].reference = refADC::v36;
     anachans[ach].resolution = 10;
+	#ifndef BLUEFRUIT_H_
+	 anachans[ach].setResolution(12);
+	#endif
   }
   nChans=nPins;
 }
@@ -222,6 +234,7 @@ bool anaIO::setReference(word mVref ) {
 	bool chg = false;
 	if (setMode(INPUT_ANALOG)) { 
 		word ref;
+		#ifdef BLUEFRUIT_H_
 		for (ref=0; ref<NREFS && mVREF[ref]<mVref; ref++) {}
 		chg = (ref<NREFS && reference != (refADC)ref);
 		if (chg){
@@ -229,6 +242,7 @@ bool anaIO::setReference(word mVref ) {
 			analogReference(ADCREFMODES[ref]); 
 			reference=(refADC)ref;
 		}
+		#endif
 	}
 	return chg;
 }
@@ -237,7 +251,11 @@ void anaIO::setResolution(byte nbits) {
 	analogReadResolution(nbits);
 }
 float anaIO::maxVoltRange() {
-  return float(mVREF[(int)reference])/1000.0;
+	#if BLUEFRUIT_H_
+	return float(mVREF[(int)reference])/1000.0;
+	#else
+	return 3.3;  // ???
+	#endif
 }
 
 float anaIO::getVoltage() {

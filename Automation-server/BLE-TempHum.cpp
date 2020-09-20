@@ -71,6 +71,8 @@ float checkTrig(float val, float & prev) {
   return 0.0;
 }
 
+// check for trigger condition (a large change since prev notific),
+// if so notify when enabled otherwise just write
 bool pollSHT31(float & temp, float & humidity, ulong mstick) {
   if (sht31 == NULL)
     return false;
@@ -99,9 +101,9 @@ bool pollSHT31(float & temp, float & humidity, ulong mstick) {
         Serial.print(" temperature:"); Serial.print(temp); 
       }
     }
-    if (! isnan(humidity) ) {
+    if ( !isnan(humidity) ) {
       uint16_t hum = ROUND_2_INT(humidity*100.0);
-      float humchg = checkTrig(humidity, prevHum);
+      float humchg = checkTrig(fabs(humidity-50.0)-20.0, prevHum);  // largest %dev when very dry or very wet
       changed += fabs(humchg);
       if (sh31c.notifyEnabled() && humchg>0.0 ) {
         if ( sh31c.notify16(hum) ){
@@ -109,12 +111,11 @@ bool pollSHT31(float & temp, float & humidity, ulong mstick) {
         }else{
           sh31c.write16(hum);
           //Serial.print("humidity written : "); Serial.println(humidity); 
-          //Serial.println("ERROR: Notify not set in the CCCD or not connected!");
         }
-       }else{
+      } else {
           sh31c.write16(hum);
           Serial.print(" humidity:"); Serial.print(humidity); 
-       }
+      }
     }
   }
   return changed;
