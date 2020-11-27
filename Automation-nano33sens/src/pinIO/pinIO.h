@@ -10,13 +10,9 @@
 #define OUTPUT_ANALOG   (0x5)
 #define IO_NONE        (0xff)
 
-#ifndef BLUEFRUIT_H_
-#define LED_RED LED_BUILTIN
-#endif
+#define ULONG_MAX  0xffffffff 
 
-const uint8_t ANALOG_TO_PIN[8] = {PIN_A0,PIN_A1,PIN_A2,PIN_A3,PIN_A4,PIN_A5,PIN_A6,PIN_A7};
-bool isReserved(byte pin);
-
+#ifdef BLUEFRUIT_H_  // adafruit nrf
 #define NREFS 6		//analog reference voltages
 enum class refADC {
     v12,
@@ -25,8 +21,24 @@ enum class refADC {
     v30,
     v36,
     vVDD
-};
+ };
+#else // arduino nano ble 
+#define NREFS 4		//analog reference voltages
+enum class refADC {
+	 v06,
+    v12,
+    v24,
+    vVDD
+ };
+#define LED_RED  LEDR
+#define LED_BLUE LEDB
 
+#endif
+
+const uint8_t ANALOG_TO_PIN[8] = {PIN_A0,PIN_A1,PIN_A2,PIN_A3,PIN_A4,PIN_A5,PIN_A6,PIN_A7};
+
+ulong tdiff(ulong tick1, ulong tick2);  // also in aios
+bool isReserved(byte pin);
 uint16_t volt2anaDat(float volt , uint16_t scale);
 
 // binary InputOutput bits
@@ -39,7 +51,7 @@ class pinIO {
     // assert mode to one of arduino(+) pin modes; returns success
     static bool setMode(byte iBit, byte mode){ 
       if (iBit<nPins) return pins[iBit].setMode(mode); 
-      else Serial.println("bad bitIdx"); return false; };
+      else Serial.print("bad bitIdx:"); Serial.println(iBit); return false; };
     // set value of bit
     static void setState(byte iBit, bool bitv){ 
       if (iBit<nPins) pins[iBit].setState(bitv); };

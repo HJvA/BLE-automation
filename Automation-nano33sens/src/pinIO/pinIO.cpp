@@ -15,10 +15,9 @@
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
-#include <math.h>
 #include <Arduino.h>
-//#include <bluefruit.h>
-#include "pinIO.hpp"
+#include <math.h>
+#include "pinIO.h"
 
 const char* PIN_MODE_NAMES[6] = {"input","output","pullup","pulldown","analogIn","analogOut"};
 
@@ -32,19 +31,24 @@ const char* PIN_MODE_NAMES[6] = {"input","output","pullup","pulldown","analogIn"
 #define bitWrite(value, bit, bitvalue) (bitvalue ? bitSet(value, bit) : bitClear(value, bit))
 #endif
 
-// reserved pins on adafruit feather device
+#define ROUND_2_UINT(f) ((uint16_t)(f >= 0.0 ? (f + 0.5) : (f - 0.5)))
+
+
+// reserved pins on device x
+// adafruit feather
+// arduino nano 
 const uint8_t ReservedPins[] = {
   0,1,           //  nc
   #ifdef BLUEFRUIT_H_
   PIN_VBAT,      // ,31 ,A7
   #endif
   //PIN_AREF,       // ,24
-  //PIN_SERIAL_RX,  // ,8
-  //PIN_SERIAL_TX,  // ,6
+  PIN_SERIAL_RX,  // ,8
+  PIN_SERIAL_TX,  // ,6
   //SS,         // ,18
   PIN_SPI_MISO, // ,14
   PIN_SPI_MOSI, // ,13
-  //PIN_SPI_SCK,    // ,12
+  //PIN_SPI_SCK,    // ,Led
   PIN_WIRE_SDA, // ,25
   PIN_WIRE_SCL, // ,26
   0xff
@@ -55,14 +59,23 @@ bool isReserved(byte pin) {
     if (ReservedPins[i] == pin )
       return true;
   }
+  if (pin > PIN_SERIAL_TX)  // last on nano33 ?
+    return true;
   return false;
 }
+
+// time difference between first tick1 and second tick2
+ulong tdiff(ulong tick1, ulong tick2)
+{
+	if (tick2 > tick1)
+		return tick2-tick1;
+	return ULONG_MAX - tick1 + tick2;
+}
+
 //#define IS_RESERVED(pin) ( (std::find(std::begin(ReservedPins), std::end(ReservedPins), pin) != std::end(ReservedPins)) )
 
-#define ROUND_2_UINT(f) ((uint16_t)(f >= 0.0 ? (f + 0.5) : (f - 0.5)))
-
-
 #if BLUEFRUIT_H_
+//#define refADC eAnalogReference
 eAnalogReference ADCREFMODES[NREFS] {
     AR_INTERNAL_1_2,
     AR_INTERNAL_1_8,
@@ -81,11 +94,24 @@ word mVREF[NREFS] = {  // reference voltages for analog inp
     5000
 };
 #else 
+//#define refADC  _AnalogReferenceMode
+ _AnalogReferenceMode ADCREFMODES[NREFS] {                                                                          
+  AR_INTERNAL,    // 0.6 V                                                                             
+  AR_INTERNAL1V2, // 1.2 V                                                                             
+  AR_INTERNAL2V4,  // 2.4 V 
+  AR_VDD        // 3.3 V   
+};
+word mVREF[NREFS] = {  // reference voltages for analog inp
+     600,
+    1200,
+    2400,
+    3300
+ };
+
 //const byte LED_RED = LED_BUILTIN;
 //#define LED_RED LED_PWR
 //LED_BUILTIN
 #endif
-
 
 // ****** binary IO bits (pinIO class) *********
 byte pinIO::nPins;
@@ -176,10 +202,13 @@ void anaIO::createAnaPins(byte nPins)
     anachans[ach].pin = (ANALOG_TO_PIN[ach]); 
     anachans[ach].mode = IO_NONE;  // not active by default
     anachans[ach].anaval = 0xffff;
-    anachans[ach].reference = refADC::v36;
+	#ifdef BLUEFRUIT_H_
+	 anachans[ach].reference = refADC::v36;
+	 anachans[ach].resolution = 12;
+	#else
+	 anachans[ach].reference = refADC::vVDD;  // 3.3V
     anachans[ach].resolution = 10;
-	#ifndef BLUEFRUIT_H_
-	 anachans[ach].setResolution(12);
+	 analogReadResolution(10);
 	#endif
   }
   nChans=nPins;
@@ -234,15 +263,13 @@ bool anaIO::setReference(word mVref ) {
 	bool chg = false;
 	if (setMode(INPUT_ANALOG)) { 
 		word ref;
-		#ifdef BLUEFRUIT_H_
 		for (ref=0; ref<NREFS && mVREF[ref]<mVref; ref++) {}
 		chg = (ref<NREFS && reference != (refADC)ref);
 		if (chg){
-      Serial.print("set ana reference on pin:");Serial.print(pin);Serial.print(" lev:");Serial.println(ref);
+			Serial.print("set ana reference on pin:");Serial.print(pin);Serial.print(" lev:");Serial.println(ref);
 			analogReference(ADCREFMODES[ref]); 
 			reference=(refADC)ref;
 		}
-		#endif
 	}
 	return chg;
 }
@@ -251,11 +278,7 @@ void anaIO::setResolution(byte nbits) {
 	analogReadResolution(nbits);
 }
 float anaIO::maxVoltRange() {
-	#if BLUEFRUIT_H_
 	return float(mVREF[(int)reference])/1000.0;
-	#else
-	return 3.3;  // ???
-	#endif
 }
 
 float anaIO::getVoltage() {
@@ -314,7 +337,7 @@ bool pinIO::acceptBLEdig(uint8_t * bledat, uint8_t len){
       	bool bv = bit2 & 1;
       	if (getState(iBit) != bv) {
       		setState(iBit, bv);
-     			changed++;
+      		changed++;
       	}
       }
    }
@@ -345,3 +368,5 @@ word pinIO::produceBLEdig(uint8_t * bledat, uint8_t len){
   }
   return changed;
 }
+
+

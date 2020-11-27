@@ -5,6 +5,8 @@ import time
 import logging
 import os,re,sys
 import threading
+import hashlib, hmac
+from pathlib import Path
 
 def bytes_to_int(data, endian='>', signed=True):
 	"""Convert a bytearray into an integer, considering the first bit sign."""
@@ -18,8 +20,8 @@ def bytes_to_int(data, endian='>', signed=True):
 	encoded = ''.join(format(x, '02x') for x in data) 
 	return int(encoded, 16)
 
-def bytes_to_hex(data):
-	return ''.join(format(x, '02x') for x in data)
+def bytes_to_hex(data, separ='', frmt='02x'):
+	return separ.join(format(x, frmt) for x in data)
 
 def load_lod(lod, csv_fp, fields=['id','name']):
 	''' get list of dict from csv file
@@ -63,6 +65,7 @@ def seconds_since_epoch(epoch = datetime.datetime.utcfromtimestamp(0), utcnow=da
 
 
 class RepeatTimer(object):
+	''' runs a function in backgroud at specified interval '''
 	def __init__(self, interval, function, *args, **kwargs):
 		logging.info('setting up interval timer to run %s every %f seconds' % (function,interval))
 		self._timer     = None
@@ -89,34 +92,19 @@ class RepeatTimer(object):
 		self._timer.join() # hold main tread till realy finished
 		self.is_running = False	
 
-"""												
-def set_logger(filename=None, format='%(levelname)-6s %(message)s', level=logging.NOTSET):
-	'''obsolete
-	'''
-	formatter = logging.Formatter(format)
-	if filename is None:
-		hand = logging.StreamHandler() # console
-	else:
-		hand = logging.FileHandler(filename=filename, mode='w')
-	hand.setLevel(level)
-	hand.setFormatter(formatter)
-	logger = logging.getLogger()
-	logger.setLevel(level)
-	[logger.removeHandler(h) for h in logger.handlers[::-1]]
-	logger.addHandler(hand)
-	return hand
-"""	
-
-def set_logger(logger, pyfile=None, levelConsole=logging.INFO, levelLogfile=logging.DEBUG):
+def set_logger(logger, pyfile=None, levelConsole=logging.INFO, levelLogfile=logging.DEBUG, destDir='~/log/'):
 	""" reset logger to desired config having several handlers :
 	Console; logFile; errorLogFile"""
 	[logger.removeHandler(h) for h in logger.handlers[::-1]] # handlers may persist between calls
 	hand=logging.StreamHandler()
 	hand.setLevel(levelConsole)
 	logger.addHandler(hand)	# use console
-	
+	if destDir:
+		destDir = os.path.expanduser(destDir)
+		if not os.path.isdir(destDir):
+			Path(destDir).mkdir(parents=False, exist_ok=False)
 	# always save errors to a file
-	hand = logging.FileHandler(filename='error.log', mode='a')
+	hand = logging.FileHandler(filename=destDir+'error_fsHome.log', mode='a')
 	hand.setLevel(logging.ERROR)	# error and critical
 	logger.addHandler(hand)
 	
@@ -126,10 +114,10 @@ def set_logger(logger, pyfile=None, levelConsole=logging.INFO, levelLogfile=logg
 		base=base.group(1)
 	else:
 		base=__name__
-	logger.addHandler(logging.FileHandler(filename=base+'.log', mode='w', encoding='utf-8'))
+	logger.addHandler(logging.FileHandler(filename=destDir+base+'.log', mode='w', encoding='utf-8'))
 	logger.setLevel(levelLogfile)
 	if pyfile == "__main__":
-		logger.critical("### running %s dd %s ###" % (__name__,time.strftime("%y%m%d %H:%M:%S")))
+		logger.critical("### running %s dd %s logging to %s ###" % (__name__,time.strftime("%y%m%d %H:%M:%S"),destDir+base+'.log'))
 	return logger
 
 def get_logger(pyfile=None, levelConsole=logging.INFO, levelLogfile=logging.DEBUG):
@@ -145,6 +133,24 @@ def get_logger(pyfile=None, levelConsole=logging.INFO, levelLogfile=logging.DEBU
 	logger.critical("starting %s dd %s" % (root, time.strftime("%d %H:%M:%S", time.localtime())))
 	return logger
 
+def hash_new_password(password: str, salt = None): # -> Tuple[bytes, bytes]:
+	"""
+    Hash the provided password with a randomly-generated salt and return the
+    salt and hash to store in the database.
+	"""
+	if not salt:
+		salt = os.urandom(16)
+	pw_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+	return salt, pw_hash
+
+def is_correct_password(salt: bytes, pw_hash: bytes, password: str): # -> bool:
+	"""
+    Given a previously-stored salt and hash, and a password provided by a user
+    trying to log in, check whether the password is correct.
+	"""
+	return hmac.compare_digest(
+		pw_hash, hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+	)
 	
 if __name__ == "__main__":
 	#set_logger(level=logging.INFO)

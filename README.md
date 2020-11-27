@@ -28,8 +28,9 @@ The Pythonista app has some very nice possibilities to build python 3 apps. Incl
 To setup BLE (i.e. bluepy) for Python on a Raspberry pi execute the following commands:  
   
 ```bash  
+sudo apt-get install git build-essential libglib2.0-dev  
 cd rpi-AIOS-client  
-git clone ....
+git clone https://github.com/IanHarvey/bluepy.git
 cd bluepy  
 pip3 install .
 or python3 setup.py develop --user   
