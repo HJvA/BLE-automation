@@ -2,7 +2,7 @@
 
 //  https://learn.adafruit.com/bluefruit-nrf52-feather-learning-guide/nrf52-adc
 #define AIOS_UUID(val) ("555a0002-" val "-467a-9538-01f0652c74e8")
-#define noANAS 1
+#define ANAS 1
 
 /* AIOS  ​Automation IO Service */
 #define UUID16_SVR_AUTOMATION_IO     "1815"
@@ -48,7 +48,7 @@
    </Summary> 
    If a device has more than one instance of the Analog characteristic, each characteristic shall include a Characteristic Presentation Format descriptor that has a namespace / description value that is unique for that instance of the Analog characteristic. The Namespace «Bluetooth SIG» as defined in [2] shall be used. Description values from 0x0001 and upwards shall be used to uniquely identify each Analog characteristic.
    */
-#define DSC_characteristic_presentation_format  0x2904  // for ch=%d
+#define DSC_characteristic_presentation_format  "2904"  // for ch=%d
 #define DSC_data_type_uint16                  06
 #define DSC_data_type_sint16                  14
 
@@ -78,6 +78,25 @@
 #define vtONBOUNDARY 6
 #define vtNONE 7
 
+#ifndef LenDigBits
+const uint8_t nAnaChan = 4;  // NUM_ANALOG_INPUTS-1; //TOTAL_ANALOG_PINS;  leave out Battery channel
+const uint8_t nDigBits = 24 ; //NUM_DIGITAL_PINS; 
+
+// nr of bytes required to store dig io bits i.e. 4 per byte
+#define LenDigBits ((nDigBits >> 2) + ((nDigBits &3) ? 1 : 0))
+
+#endif
+
+// https://www.bluetooth.com/wp-content/uploads/Sitecore-Media-Library/Gatt/Xml/Descriptors/org.bluetooth.descriptor.gatt.characteristic_presentation_format.xml
+// gatttool -b C9:04:5E:8D:26:97 --char-read --handle 0x001e
+// Characteristic value/descriptor: 14 fb 00 20 00 00 00 00
+typedef struct __attribute__ ((packed)) pres_format_t {
+	uint8_t  format;      // enum "0" .. "27"
+	int8_t   exponent;    // 
+	uint16_t unit;        // uuid
+	uint8_t  namespc;     // used to identify the organization
+	int16_t  description; // enumerated value from the organization (also for analog channel nr)
+	} prs_frm_t;
 
 // structures for trigger conditions
 // these struct result in condition beeing first / Big Endian
@@ -101,17 +120,10 @@ typedef struct ana_val_trig_t {
 		uint16_t vals[2];
 	} lev;
 	} ana_val_trig_t;
-typedef struct ana_valid_range_t {
+typedef struct __attribute__ ((packed)) ana_valid_range_t {
   uint16_t Lower_inclusive_value;
   uint16_t Upper_inclusive_value;
 } ana_valid_range_t;
-
-const uint8_t nAnaChan = 1;  // NUM_ANALOG_INPUTS-1; //TOTAL_ANALOG_PINS;  leave out Battery channel
-const uint8_t nDigBits = 25 ; //NUM_DIGITAL_PINS; 
-#ifndef LenDigBits
-// nr of bytes required to store dig io bits i.e. 4 per byte
-#define LenDigBits ((nDigBits >> 2) + ((nDigBits &3) ? 1 : 0))
-#endif
 
 class digCharacteristic : public BLECharacteristic
 {
@@ -127,17 +139,17 @@ class digCharacteristic : public BLECharacteristic
 
 class anaCharacteristic : public BLEShortCharacteristic
 {
-  public:
-    byte anachan;
-    anaCharacteristic();  //dummy
-	 #ifdef ANAS
-    anaCharacteristic(char* bleuuid, uint8_t chan);
-    void addDescriptors(void);
-    #endif
-    void updateVoltRange(void);
-	 bool notifyEnabled(void);
-  protected:
-	 ana_valid_range_t ana_valid_range;
+	public:
+		byte anachan;
+		anaCharacteristic();  //dummy
+		#ifdef ANAS
+		anaCharacteristic(char* bleuuid, uint8_t chan);
+		//void addDescriptors(void);
+		#endif
+		void updateVoltRange(void);
+		bool notifyEnabled(void);
+	protected:
+		ana_valid_range_t ana_valid_range;
     //uint16_t valrngHandle;
 };
 

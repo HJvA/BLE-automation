@@ -3,10 +3,8 @@
 #include "src/pinIO/pinIO.h"
 #include "src/AIOS/BLE-AIOS.h"
 
-#define nDigBits  24
-
 //#define ENV_SVR   "6c2fe8e1-2498-420e-bab4-81823e7b0c03"
-BLEService   EnvSvr  (UUID16_SVR_ENV_SENSING);
+//BLEService   EnvSvr  (UUID16_SVR_ENV_SENSING);
 BLEService   aios    (UUID16_SVR_AUTOMATION_IO);
 
 void onBLEConnected(BLEDevice central) {
@@ -51,12 +49,12 @@ void setupEnvSvr(BLEService EnvSvr)
 	Serial.print("nano33sens EnvSvr by: HJvA@hotmail.nl ,  freemem:");Serial.println(freeMemory());
 	//BLE.debug(Serial);
 	
-	pinIO::createDigBits(nDigBits);
+	//pinIO::createDigBits(nDigBits);
 	setupHTS221(EnvSvr);
 	setupBARO(EnvSvr);
 	
 }
-
+#ifdef WDT
 // WatchDogTimer
 void enableWDT() {
   //Configure WDT on nRF52840.
@@ -70,6 +68,7 @@ void resetWDT() {
   // Reload the WDTs RR[0] reload register
   NRF_WDT->RR[0] = WDT_RR_RR_Reload; 
 }
+#endif
 
 void setup()
 {
@@ -86,15 +85,17 @@ void setup()
 	BLE.setLocalName(name.c_str());
 	BLE.setDeviceName(name.c_str());
 	
-	setupEnvSvr(EnvSvr);
-	BLE.addService(EnvSvr);
-	
-	//setupANAC(aios);
-	//setupDIGC(aios);
-	
+	setupEnvSvr(aios);
 	//BLE.addService(aios);
+	
+	#ifdef ANAS
+	setupANAC(aios);
+	#endif
+	setupDIGC(aios);
+	
+	BLE.addService(aios);
 	//BLE.setAdvertisedService(aios);
-	BLE.setAdvertisedService(EnvSvr);
+	BLE.setAdvertisedService(aios);
 	
 	// Setup the advertising packet(s)
 	Serial.println("\nAdvertising");
@@ -128,14 +129,18 @@ void loop()
 				starting = false;
 				//BLE.setAdvertisingInterval(6400); // x * 0.625 ms = 4 s   
 			} else {
-				resetWDT();
+				#ifdef WDT
+				  resetWDT();
+				#endif
 				pinIO::setState(LEDR, true);
 				ulong mstick = millis();
 				changed = 0;
 				changed += pollHTS221(temperat, humidity, mstick);
 				changed += pollBARO(pressure, mstick);
-				//changed += pollDIGC(mstick);
-				//changed += pollANAC(mstick);
+				changed += pollDIGC(mstick);
+				#ifdef ANAS
+				changed += pollANAC(mstick);
+				#endif
 				if (changed) {  // having trigger condition
 					Serial.println(",");
 					pinIO::setState(LEDR, false);

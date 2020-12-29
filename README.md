@@ -5,6 +5,8 @@ The GATT automation-IO profile defines an Bluetooth Low Energy device with digit
 
 As an extra, the Adafruit / Arduino software also has sensors implemented for temperature, humidity, eCO2, TVOC, using the I2C bus with the SHT31-D and the CCS811 breakout boards.
 
+Added support for the Arduino Nano 33 Sense i.e. getting GATT AIOS
+
 ## Automation server
 
 ### GATT enhancements:
@@ -59,4 +61,6 @@ ported to fshome project
 <https://www.adafruit.com/product/3406>
 - The bluepy package for BLE on a raspberry
 <https://github.com/IanHarvey/bluepy>
+- The ArduinoBLE bluetooth library for Arduino Nano 33 board
+<https://www.arduino.cc/en/Reference/ArduinoBLE>
 

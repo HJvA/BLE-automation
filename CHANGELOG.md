@@ -14,6 +14,9 @@ Sections
 ### Breaking Changes
 ### Developers
 --> 
+## [1.2.2] - 2020-12-29
+- Gatt AIOS for Arduino Nano 33 Sens, beta version. using ArduinoBLE library.
+
 ## [1.2.1] - 2020-09-25
 ### Added
 - Arduino Nano 33 BLE added as test version

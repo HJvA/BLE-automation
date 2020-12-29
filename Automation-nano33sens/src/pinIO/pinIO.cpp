@@ -33,7 +33,6 @@ const char* PIN_MODE_NAMES[6] = {"input","output","pullup","pulldown","analogIn"
 
 #define ROUND_2_UINT(f) ((uint16_t)(f >= 0.0 ? (f + 0.5) : (f - 0.5)))
 
-
 // reserved pins on device x
 // adafruit feather
 // arduino nano 
@@ -45,12 +44,12 @@ const uint8_t ReservedPins[] = {
   //PIN_AREF,       // ,24
   PIN_SERIAL_RX,  // ,8
   PIN_SERIAL_TX,  // ,6
-  //SS,         // ,18
-  PIN_SPI_MISO, // ,14
-  PIN_SPI_MOSI, // ,13
+  //SS,           // ,18
+  PIN_SPI_MISO,   // ,14
+  PIN_SPI_MOSI,   // ,13
   //PIN_SPI_SCK,    // ,Led
-  PIN_WIRE_SDA, // ,25
-  PIN_WIRE_SCL, // ,26
+  PIN_WIRE_SDA,   // ,25
+  PIN_WIRE_SCL,   // ,26
   0xff
 };
 // check whether pin is not available (F)

@@ -30,14 +30,22 @@ class bluepyDelegate(btle.DefaultDelegate):
 		super().__init__()
 		logger.info("connecting to BLE device:%s scaling:%s on %s" % (devAddress,scales,loop))
 		try:
-			self.dev = btle.Peripheral(devAddress, btle.ADDR_TYPE_PUBLIC)  # btle.ADDR_TYPE_RANDOM)
+			self.dev = btle.Peripheral(devAddress)  #, btle.ADDR_TYPE_RANDOM)  #, btle.ADDR_TYPE_PUBLIC
+			#time.sleep(1)
 			self.dev.withDelegate( self )
+			#time.sleep(1)
 		except btle.BTLEDisconnectError as e:
 			logger.error('unable to connect ble device : %s' % e)
 			self.dev = None
 		self.queue = asyncio.Queue(loop=loop)
 		self.notifying = {}
 		self.scales=scales
+		if self.dev:
+			stat = self.dev.getState()
+			for svc in self.dev.services:  # internally populate services
+				#if btle.UUID(AIOS_SVR) == svc.uuid:
+				#	aios=svc
+				logger.info('stat:%s service:%s' % (stat,str(svc)))
 		
 	def handleNotification(self, cHandle, data):
 		""" callback getting notified by bluepy """
@@ -62,7 +70,7 @@ class bluepyDelegate(btle.DefaultDelegate):
 				chId = self._CharId(charist)
 				self.notifying[hand] = chId
 			charist.peripheral.writeCharacteristic(hand+1, b"\x01\x00", withResponse=True) # cccd on hand+1
-			logger.info('starting notificatio on (%d) %s' % (chId,charist))
+			logger.info('starting notificatio on (%d) %s hand=%d' % (chId,charist,hand))
 		else:
 			logger.warning('NOTIFY not supported by:%s on %s' % (hand,charist))
 		val = self.read(charist)
@@ -162,7 +170,7 @@ if __name__ == "__main__":	#
 	#some example GATT services
 	DEVINF_SVR= "180a"  #"0000180a-0000-1000-8000-00805f9b34fb"  # device info
 	BAS_SVR   = "180f"  #"0000180f-0000-1000-8000-00805f9b34fb"  # battery level
-	AIOS_SVR  = "1815"
+	AIOS_SVR  = 0x1815  # "1815"
 	TEMP_CHR  = "2a6e"
 	DIG_CHR   = "2a56"
 	#logging.basicConfig(level=logging.DEBUG)   #, filename="bluepyBase.log")
@@ -184,7 +192,7 @@ if __name__ == "__main__":	#
 			if btle.UUID(AIOS_SVR) == svc.uuid:
 				aios=svc
 			logger.info('stat:%s service:%s' % (stat,str(svc)))
-			time.sleep(0.1)
+			await asyncio.sleep(0.1)
 			
 			chars = svc.getCharacteristics()
 			for char in chars:
@@ -193,8 +201,12 @@ if __name__ == "__main__":	#
 				for id in charsNotifying:
 					if btle.UUID(id) == char.uuid:
 						logger.info('starting notif on %s' % char)
-						delg.startNotification(char)
-		time.sleep(0.1)
+						delg.startNotification(char) 
+				if char.uuid == btle.UUID(DIG_CHR):
+					bts = delg.read(char)
+					logger.debug('reading digitals:%s' % bts)
+		aios = delg.dev.getServiceByUUID(btle.UUID(AIOS_SVR))
+		await asyncio.sleep(0.1)
 		if aios and delg.dev and delg.dev.getState():
 			showChars(aios)
 			descr = aios.getDescriptors()
@@ -225,7 +237,7 @@ if __name__ == "__main__":	#
 	
 	logger.info("getting notified")
 	try:
-		charist = [TEMP_CHR]  #,DIG_CHR]
+		charist = [DIG_CHR]   #,TEMP_CHR]
 		asyncio.run(main(charist))
 	except Exception as e:
 		logger.error('exception:%s' % e)

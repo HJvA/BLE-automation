@@ -18,7 +18,7 @@ else:
 from lib.bluepyBase import bluepyDelegate  #,BAS_SVR,showChars
 
 AIOS_SVR = 0x1815  # "00001815-0000-1000-8000-00805f9b34fb"  # automation-IO service
-ENV_SVR  = "6c2fe8e1-2498-420e-bab4-81823e7b0c03"  # environmental service as defined in BLE_automation
+ENV_SVR  = 0x181A  # "6c2fe8e1-2498-420e-bab4-81823e7b0c03"  # environmental service as defined in BLE_automation
 
 mdOUT = 0b00	# following GATT AIOS for dig bit modes
 mdINP = 0b10
@@ -105,7 +105,7 @@ class aiosDelegate(bluepyDelegate):
 			logger.error('no ble device for notifying on %d' % chId)
 			return
 		elif self.dev.getState():
-			logger.info('starting notification on %s dev=%s' % (chId,self.dev.getState()))
+			logger.info('starting notification on %s dev=%s chan:%d' % (chId,self.dev.getState(),chId-chANA1ST))
 			if chId>=chANA1ST:  # finding which chan
 				hand = self._getAnaMap(chId - chANA1ST)
 				if hand:
@@ -146,8 +146,8 @@ class aiosDelegate(bluepyDelegate):
 				if des.handle > hand and (des.uuid == btle.UUID(CHARS[dscPRESFORM])):  # look for presentation format
 					#time.sleep(0.1)
 					datPresForm = des.read()
-					logger.debug('DescrPresForm hand:%d dat:%s uuid %s' % (des.handle,tls.bytes_to_hex(datPresForm),des.uuid))
 					chan = datPresForm[5]
+					logger.debug('DescrPresForm hand:%d chan:%s dat:%s uuid %s' % (des.handle,chan,tls.bytes_to_hex(datPresForm),des.uuid))
 					self.anamap[chan] = hand
 					logger.debug('(A%d) ana hand:%s with presfrm:%s ' % (chan, hand, des))
 					hand=9999
@@ -168,6 +168,7 @@ class aiosDelegate(bluepyDelegate):
 	def _readDigitals(self):
 		''' get aios GATT representation of digital bit values and settings '''
 		if self.dev and self.dev.getState()=='conn':
+			logger.info('svr dig uuid=%s' % btle.UUID(AIOS_SVR))
 			service = self.dev.getServiceByUUID(btle.UUID(AIOS_SVR))
 			chT = service.getCharacteristics(btle.UUID(CHARS[chDIGI]))
 			if chT:
@@ -175,6 +176,12 @@ class aiosDelegate(bluepyDelegate):
 				logger.debug('reading digitals:%s' % tls.bytes_to_hex(bts))
 				return bts
 		return None
+		
+	def readAnaVolt(self, chan):
+		charist = self._getAnaCharacteristic(chan)
+		if charist:
+			return self.read(charist)
+		return float(NaN)
 
 	def setAnaVoltRange(self, chan, volt, SCL=SCALES[chANA1ST]):
 		''' set the reference voltage for the analog channel on the aios device '''
@@ -316,32 +323,36 @@ class aiosDelegate(bluepyDelegate):
 		else:
 			return chId,val
 
-async def blinkTask(aios, bitnr=5):
+async def blinkTask(aios, bitnr=5, anaChan=0):
 	""" example task blinking led connected to pin 0.04 (A2) """
 	logger.info('running blink task')
 	while True:
-		aios.setDigPulse(bitnr, 0.9)
-		#aios.setDigBit(bitnr, True)
-		#await asyncio.sleep(0.1)
-		#aios.setDigBit(bitnr, False)
+		#aios.setDigPulse(bitnr, 0.9)
+		#chId,val = await aios.receiveCharValue()
+		val = aios.readAnaVolt(anaChan)
+		logger.info('aios:%d,%s' % (anaChan,val))
+		aios.setDigBit(bitnr, True)
+		await asyncio.sleep(0.1)
+		aios.setDigBit(bitnr, False)
 		await asyncio.sleep(9.1)
 
 async def main():
 	""" for testing """
 	DIGOUTBIT = 5  # MOSFET flash A3
 	REDLED = 17
-	DEVADDRESS = "c9:04:5e:8d:26:97"  #"d8:59:5b:cd:11:0c"    # to be adapted to address of your device
+
+	DEVADDRESS = "C9:04:5E:8D:26:97" # "d8:59:5b:cd:11:0c"    # to be adapted to address of your device
 	
 	logger.info("Connecting...")
-	aios = aiosDelegate(DEVADDRESS)
+	aios = aiosDelegate(DEVADDRESS, loop=asyncio.get_running_loop())
 	
 	if aios.dev:
 		# activate environamental service
 		#aios.startServiceNotifyers(aios.dev.getServiceByUUID(btle.UUID(ENV_SVR))) 
-		#aios.setAnaVoltRange(1, 1.2)
-		#aios.startChIdNotifyer(chDIGI)
-		#aios.startChIdNotifyer(chANA1ST+1)  # activate A1 analog channel
-		aios.startChIdNotifyer(chTEMP)
+		aios.setAnaVoltRange(1, 1.2)
+		aios.startChIdNotifyer(chDIGI)
+		aios.startChIdNotifyer(chANA1ST+1)  # activate A1 analog channel
+		#aios.startChIdNotifyer(chTEMP)
 	try:
 		tasks = aios.tasks()
 		tasks.append(asyncio.create_task( blinkTask(aios, DIGOUTBIT) ))
