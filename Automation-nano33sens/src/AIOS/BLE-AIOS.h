@@ -120,10 +120,10 @@ typedef struct ana_val_trig_t {
 		uint16_t vals[2];
 	} lev;
 	} ana_val_trig_t;
-typedef struct __attribute__ ((packed)) ana_valid_range_t {
+typedef struct {
   uint16_t Lower_inclusive_value;
   uint16_t Upper_inclusive_value;
-} ana_valid_range_t;
+}__attribute__((packed)) ana_valid_range_t;
 
 class digCharacteristic : public BLECharacteristic
 {
@@ -137,7 +137,7 @@ class digCharacteristic : public BLECharacteristic
 };
 
 
-class anaCharacteristic : public BLEShortCharacteristic
+class anaCharacteristic : public BLECharacteristic
 {
 	public:
 		byte anachan;
@@ -148,8 +148,8 @@ class anaCharacteristic : public BLEShortCharacteristic
 		#endif
 		void updateVoltRange(void);
 		bool notifyEnabled(void);
-	protected:
-		ana_valid_range_t ana_valid_range;
+		float VoltRange(void);
+	//protected:
     //uint16_t valrngHandle;
 };
 

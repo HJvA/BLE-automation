@@ -22,7 +22,7 @@ enum class refADC {
     v36,
     vVDD
  };
-#else // arduino nano ble 
+#else // arduino nano33 ble 
 #define NREFS 4		//analog reference voltages
 enum class refADC {
 	 v06,

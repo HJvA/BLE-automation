@@ -1,7 +1,17 @@
+
+#include <Arduino.h>
 #include <ArduinoBLE.h>
+
+#ifdef uRAM
+#define RAMEND 0
+#define SP 0
+#include <MemoryUsage.h>
+#endif
+
 #include "src/BLE-TempHum.h"
 #include "src/pinIO/pinIO.h"
 #include "src/AIOS/BLE-AIOS.h"
+
 
 //#define ENV_SVR   "6c2fe8e1-2498-420e-bab4-81823e7b0c03"
 //BLEService   EnvSvr  (UUID16_SVR_ENV_SENSING);
@@ -19,25 +29,6 @@ void onBLEDisconnected(BLEDevice central) {
   pinIO::setState(LEDB, true);
 }
 
-#ifdef __arm__
-// should use uinstd.h to define sbrk but Due causes a conflict
-extern "C" char* sbrk(int incr);
-#else  // __ARM__
-extern char *__brkval;
-#endif  // __arm__
-
-int freeMemory() {
-  char top;
-#ifdef __arm__
-  return &top - reinterpret_cast<char*>(sbrk(0));
-#elif defined(CORE_TEENSY) || (ARDUINO > 103 && ARDUINO != 151)
-  return &top - __brkval;
-#else  // __arm__
-  return __brkval ? &top - __brkval : &top - __malloc_heap_start;
-#endif  // __arm__
-}
-
-
 void setupEnvSvr(BLEService EnvSvr)
 {
 	Serial.begin(9600);
@@ -46,7 +37,7 @@ void setupEnvSvr(BLEService EnvSvr)
 	if (!BLE.begin()) {
 		Serial.println("Failed to initialized BLE!");
 	}
-	Serial.print("nano33sens EnvSvr by: HJvA@hotmail.nl ,  freemem:");Serial.println(freeMemory());
+	Serial.print("nano33sens EnvSvr by: HJvA@hotmail.nl ,  freemem:");
 	//BLE.debug(Serial);
 	
 	//pinIO::createDigBits(nDigBits);
@@ -128,6 +119,9 @@ void loop()
 				//delay(100);
 				starting = false;
 				//BLE.setAdvertisingInterval(6400); // x * 0.625 ms = 4 s   
+				#ifdef uRAM
+				FREERAM_PRINT;
+				#endif
 			} else {
 				#ifdef WDT
 				  resetWDT();
@@ -145,14 +139,14 @@ void loop()
 					Serial.println(",");
 					pinIO::setState(LEDR, false);
 					//uint8_t BatPerc = pollBatteryService();
-					Serial.print(" Temp:");Serial.print(temperat, DEC); 
-					Serial.print(" Humi:");Serial.print(humidity, DEC);
-					Serial.print(" Baro:");Serial.print(pressure, DEC);
+					Serial.print(" Temp:");Serial.print(temperat, 2); 
+					Serial.print(" Humi:");Serial.print(humidity, 1);
+					Serial.print(" Baro:");Serial.print(pressure, 2);
 					//Serial.print(" Bat%:");Serial.print(BatPerc);
 					Serial.print(" Rssi:");Serial.print(central.rssi());
 				} else {
 					Serial.print(".");
-					//Serial.print(freeMemory()); Serial.print("");
+					//Serial.print(freeRam()); Serial.print("");
 					delay(400);
 					//resetWDT();
 				}

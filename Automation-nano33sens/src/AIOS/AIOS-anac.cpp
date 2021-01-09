@@ -1,8 +1,7 @@
 /*************
+ * makes pinIO analog output available through BLE AIOS interface
  * https://www.geeksforgeeks.org/how-to-initialize-array-of-objects-with-parameterized-constructors-in-c/
- * 
  *************/
-
 
 #include <Arduino.h>
 #include <ArduinoBLE.h>
@@ -38,11 +37,11 @@ void on_anac_subscribed(BLEDevice central, BLECharacteristic& chr, byte chan){
 			}
 	} else {
 		int nd = chr.descriptorCount();
-		Serial.print("nDescr:");Serial.println(nd);
+		Serial.print("no PrsFrmDscr, nDescr:");Serial.println(nd);
 		for (byte i=0;i<nd;i++){
 			Serial.print(chr.descriptor(i).uuid());
 		}
-		Serial.println("no presFormDesc");
+		// assume same characteristic is returned as was added to service
 		//anaCharacteristic* ana = dynamic_cast<anaCharacteristic*>(&chr);
 		anaCharacteristic* ana = static_cast<anaCharacteristic*>(&chr);
 		ch = ana->anachan;
@@ -62,7 +61,7 @@ void on_anac_subscribed(BLEDevice central, BLECharacteristic& chr, byte chan){
 			Serial.print("bad chan:");Serial.println(chan);
 		}
 		
-	Serial.print("readval:");
+	Serial.print("readval:len:");Serial.println(len,DEC);
 	for (int i=0;i<len;i++)
 		Serial.print(datbuf[i], HEX);
 }
@@ -75,13 +74,18 @@ void on_anac4_subscribed(BLEDevice central, BLECharacteristic chr){ on_anac_subs
 void on_anac5_subscribed(BLEDevice central, BLECharacteristic chr){ on_anac_subscribed(central, chr, 5);}
 void on_anac6_subscribed(BLEDevice central, BLECharacteristic chr){ on_anac_subscribed(central, chr, 6);}
 void on_anac7_subscribed(BLEDevice central, BLECharacteristic chr){ on_anac_subscribed(central, chr, 7);}
+#ifdef desc_ev
+void on_rngdescwritten(BLEDevice central, BLEDescriptor desc) {}
+#endif
 
+//anaCharacteristic::anaCharacteristic():BLEShortCharacteristic(UUID16_CHR_ANALOG,BLERead){} // dummy
+//anaCharacteristic::anaCharacteristic():BLECharacteristic(NULL){} // dummy
 
-anaCharacteristic::anaCharacteristic():BLEShortCharacteristic(UUID16_CHR_ANALOG,BLERead){} // dummy
 
 #ifdef ANAS
 anaCharacteristic::anaCharacteristic(char* bleuuid, uint8_t chan) : 
-	BLEShortCharacteristic(bleuuid, BLEBroadcast |  BLERead | BLENotify) { 
+	//BLEShortCharacteristic(bleuuid, BLEBroadcast |  BLERead | BLENotify) { 
+	BLECharacteristic(bleuuid, BLEBroadcast |  BLERead | BLENotify, sizeof(short), true) {
 		uint8_t* AnaPresentationFormat { new uint8_t[APFSZ] 
 		{
 			DSC_data_type_uint16, // Format = 6 = "unsigned 16-bit integer"
@@ -93,12 +97,33 @@ anaCharacteristic::anaCharacteristic(char* bleuuid, uint8_t chan) :
 			0x00, // ditto (high byte)
 		}};
 	anachan = chan;
-	Serial.print("constr.anachan:");Serial.println(chan);
+	Serial.print("constr.anachan:");Serial.print(chan);
+	ana_valid_range_t ana_valid_range;
 	ana_valid_range.Lower_inclusive_value= 0;
-	ana_valid_range.Upper_inclusive_value= anaIO::maxVoltRange(chan);
-	
-	BLEDescriptor rngdesc(DSC_valid_range, (const uint8_t*) &ana_valid_range, sizeof(ana_valid_range_t));
-	addDescriptor(rngdesc);
+	ana_valid_range.Upper_inclusive_value= int(VoltRange() *anaSCALE);  // take actual setting
+	Serial.print(" with maxVrng:");Serial.println(float(ana_valid_range.Upper_inclusive_value)/anaSCALE);
+	#ifndef DESC2
+	 byte len = sizeof(ana_valid_range_t);
+	 uint8_t buf[len];
+	 //memcpy(buf, &ana_valid_range, len);
+	 //BLEDescriptor rngdesc(DSC_valid_range, buf, len);
+	 BLEDescriptor rngdesc(DSC_valid_range, reinterpret_cast<uint8_t*>(&ana_valid_range), len);
+	 addDescriptor(rngdesc);
+	 //byte len = rngdesc.valueSize();
+	 if (len == rngdesc.valueSize()){
+		rngdesc.readValue(buf, len);
+		for (byte i=0;i<len;i++){
+			Serial.print(buf[i],HEX);Serial.print(".");
+		}
+		rngdesc.readValue((char *)&ana_valid_range, len);
+		Serial.print(" Vmax read=");Serial.println(ana_valid_range.Upper_inclusive_value,DEC);  // ok
+	 } else {
+		Serial.print("bad len:");Serial.println(len);
+	 }
+	 #ifdef desc_ev
+	 rngdesc.setEventHandler(BLEWritten, on_rngdescwritten);  // not available in descriptor!
+	 #endif
+	#endif
 	//anac[ch].setPresentationFormatDescriptor(DSC_data_type_uint16, -4, UN_voltage_volt, 0, ch); 
 	//pres_format_t  prfrm;
 	//prfrm	= new (pres_format_t) { DSC_data_type_uint16, -4, UN_voltage_volt, 0, chan };
@@ -107,8 +132,8 @@ anaCharacteristic::anaCharacteristic(char* bleuuid, uint8_t chan) :
 		
 	//BLEDescriptor prfrmdesc(DSC_characteristic_presentation_format, (uint8_t*) prfrm, sizeof(pres_format_t) );
 	//prfrmdesc.setvalue(AnaPresentationFormat, sizeof(AnaPresentationFormat));
-	addDescriptor(prfrmdesc);
-	Serial.print("DescCnt:");Serial.println(descriptorCount());
+	addDescriptor(prfrmdesc);  // ok
+	//Serial.print("DescCnt:");Serial.println(descriptorCount());  //  !! is 0 ??
 	//Serial.print("handle:");Serial.println(handle());
 	switch (chan) {
 		case 0: setEventHandler(BLESubscribed, on_anac0_subscribed); break;
@@ -120,7 +145,7 @@ anaCharacteristic::anaCharacteristic(char* bleuuid, uint8_t chan) :
 		case 6: setEventHandler(BLESubscribed, on_anac6_subscribed); break;
 		case 7: setEventHandler(BLESubscribed, on_anac7_subscribed); break;
 	}
-	
+	updateVoltRange();
 }
 #endif
 bool anaCharacteristic::notifyEnabled(void)
@@ -134,20 +159,28 @@ bool anaCharacteristic::notifyEnabled(void)
 // checks GATT valid range descriptor to set analog reference voltage
 void anaCharacteristic::updateVoltRange(void) {
 	#ifdef ANAS
-	//ana_valid_range_t ana_valid_range;
+	ana_valid_range_t ana_valid_range;
+	//BLELocalCharacteristic* loc = local();
 	if (hasDescriptor(DSC_valid_range)) {
 		BLEDescriptor desc = descriptor(DSC_valid_range);
 		desc.readValue((uint8_t*)&ana_valid_range, sizeof(ana_valid_range_t));
-	} else {
-		Serial.print("rng error:");Serial.println(DSC_valid_range);
+		Serial.print("due Volt rng:");Serial.println(ana_valid_range.Upper_inclusive_value);
+		anaIO::setReference(anachan, ana_valid_range.Upper_inclusive_value*1000/anaSCALE);  // mV
+	} else {  // in client it appears but not here!
+		Serial.print("no rng descr!");Serial.println(DSC_valid_range);
 	}
 	//uint8_t buf[200];
 	//desc.readValue(buf,sizeof(ana_valid_range_t));
 	//memcpy(ana_valid_range,buf,sizeof(ana_valid_range_t));
-	anaIO::setReference(anachan, ana_valid_range.Upper_inclusive_value /(anaSCALE/1000));  
+	  
 	#endif
 	Serial.print("set VoltRng on:");Serial.print(anachan); Serial.print(" to [mV]:");
-	Serial.println(ana_valid_range.Upper_inclusive_value /(anaSCALE/1000));
+	Serial.println(VoltRange()*1000);
+	//Serial.println(ana_valid_range.Upper_inclusive_value /(anaSCALE/1000));
+}
+
+float anaCharacteristic::VoltRange(void) {
+	return anaIO::maxVoltRange(anachan);
 }
 
 void setupANAC(BLEService& aios)
@@ -156,14 +189,24 @@ void setupANAC(BLEService& aios)
 	anac = new anaCharacteristic*[nAnaChan];  // allready invokes dummy
 	//anaCharacteristic** anac = new anaCharacteristic*[nAnaChan];
 	
-	for (byte pini=0; pini<nAnaChan; pini++) {
+	for (byte chan=0; chan<nAnaChan; chan++) {
 		#ifdef ANAS
-		ana_time_trigs[pini] = { ttINTERVAL,0, 60000U };		// 
-		ana_val_trigs[pini] = { vtDEVIATES, 1*anaSCALE }; // only notify when step>1V i.e. default setting
-		//anac[pini] = anaCharacteristic(UUID16_CHR_ANALOG, pini);  // chracteristic for each pin
-		anac[pini] = new anaCharacteristic (UUID16_CHR_ANALOG, pini);
-		anaCharacteristic ana = *anac[pini];  //anaCharacteristic(UUID16_CHR_ANALOG, pini);
+		ana_time_trigs[chan] = { ttINTERVAL,0, 60000U };		// 
+		ana_val_trigs[chan] = { vtDEVIATES, 1*anaSCALE }; // only notify when step>1V i.e. default setting
+		//anac[chan] = anaCharacteristic(UUID16_CHR_ANALOG, chan);  // chracteristic for each pin
+		anac[chan] = new anaCharacteristic (UUID16_CHR_ANALOG, chan);
+		anaCharacteristic ana = *anac[chan];  //anaCharacteristic(UUID16_CHR_ANALOG, chan);
+		
+		#ifdef DESC2   // otherwise done in constructor
+		ana_valid_range_t ana_valid_range;
+		ana_valid_range.Lower_inclusive_value= 0;
+		ana_valid_range.Upper_inclusive_value= ana.VoltRange() *anaSCALE;  // take actual setting
+		BLEDescriptor rngdesc(DSC_valid_range, (const uint8_t*) &ana_valid_range, sizeof(ana_valid_range_t));
+		ana.addDescriptor(rngdesc);
+		#endif
 		aios.addCharacteristic(ana);
+		Serial.print("anaCh:");Serial.print(chan); Serial.print(" nDescr");Serial.print(ana.descriptorCount());
+		Serial.print(" Vrng:");Serial.println(ana.VoltRange());
 		#endif
 	}
 	Serial.print(" bytes nAnaChan="); Serial.println(nAnaChan,DEC);
@@ -198,7 +241,7 @@ word pollANAC(ulong tick)
 					anac[chan]->writeValue(ana);  //save
 					Serial.print(" [V]:");  
 				}
-				Serial.print(float(ana)/anaSCALE, DEC );
+				Serial.print(float(ana)/anaSCALE, 3 );
 			} else if (anaIO::getMode(chan) == INPUT_ANALOG) {
 				uint16_t ana = takeAnaGatt(chan);
 				if (ana < 0xfff0) {	// valid sample

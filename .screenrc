@@ -1,0 +1,14 @@
+# don't display the copyright page
+startup_message off
+
+# increase scrollback buffer size
+defscrollback 10000
+
+# create windows
+chdir ~
+caption always "%{= kw} %-w%{= gW} %n %t %{-}%+w %-="
+chdir /home/pi/Arduino/BLE-EnvSvr
+screen -t ble 
+chdir /home/pi/rpi-AIOS-client
+screen -t rpi  
+screen -t nano /dev/ttyACM0 9600 -Logfile nano.log

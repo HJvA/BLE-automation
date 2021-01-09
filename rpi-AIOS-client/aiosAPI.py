@@ -143,14 +143,18 @@ class aiosDelegate(bluepyDelegate):
 				if des.uuid == btle.UUID(CHARS[chANA1ST]):  # it is an analog channel charist
 					hand = des.handle
 				#logger.debug('des:%s , %s' % (hand,des.uuid));
-				if des.handle > hand and (des.uuid == btle.UUID(CHARS[dscPRESFORM])):  # look for presentation format
-					#time.sleep(0.1)
-					datPresForm = des.read()
-					chan = datPresForm[5]
-					logger.debug('DescrPresForm hand:%d chan:%s dat:%s uuid %s' % (des.handle,chan,tls.bytes_to_hex(datPresForm),des.uuid))
-					self.anamap[chan] = hand
-					logger.debug('(A%d) ana hand:%s with presfrm:%s ' % (chan, hand, des))
-					hand=9999
+				if des.handle > hand:
+					if	 (des.uuid == btle.UUID(CHARS[dscPRESFORM])):  # look for presentation format
+						#time.sleep(0.1)
+						datPresForm = des.read()
+						chan = datPresForm[5]
+						logger.debug('A%d DescrPresForm dshand:%d dat:%s uuid %s' % (chan,des.handle,tls.bytes_to_hex(datPresForm),des.uuid))
+						self.anamap[chan] = hand
+						#logger.debug('(A%d) ana hand:%s with presfrm:%s ' % (chan, hand, datPresForm))
+					elif (des.uuid == btle.UUID(CHARS[dscVALRNG])):
+						datVALRNG = des.read()
+						logger.debug('anhand:%s dshand:%s with anaRng:%s ' % (hand,des.handle, tls.bytes_to_hex(datVALRNG)))
+						#hand=9999
 		if self.anamap and anaChan in self.anamap:
 			return self.anamap[anaChan]
 		return None
@@ -193,7 +197,7 @@ class aiosDelegate(bluepyDelegate):
 				minmax = descr[0].read()
 				minV = tls.bytes_to_int(minmax[:2],'<',False) / SCL
 				maxV = tls.bytes_to_int(minmax[2:],'<',False) / SCL
-				logger.info('dscVALRNG : %s min=%f max=%f' % (minmax, minV,maxV))
+				logger.info('dscVALRNG (hnd:%d): %s min=%f max=%f len=%d' % (descr[0].handle,minmax, minV,maxV,len(minmax)))
 				if volt and descr:
 					minmax = (int(minV*SCL) ) + (int(volt*SCL)  << 16)
 					#minmax = (int(chan) ) + (int(volt*SCL)  << 16)	# hack to know channel at server
@@ -278,7 +282,7 @@ class aiosDelegate(bluepyDelegate):
 			logger.warning('pulse on %d still running while a new one requested')
 		else:
 			self.digPulses[bitnr] = {'start':None, 'dur':duration}
-			logger.info('digital pulse on %s duration %f' % (bitnr,duration))
+			logger.info('digital pulse on %s duration %s' % (bitnr,duration))
 		
 	async def pulseHandler(self):
 		""" handles pulse timing of an issued pulse """

@@ -52,7 +52,7 @@ int pollBARO(float & pressure, ulong mstick) {
 		if (sbaro.subscribed() && changed>0 ) {
 			byte prop = sbaro.properties();
 			if (prop & BLENotify) {
-				Serial.print("pressure notif dev%="); Serial.println(changed);
+				Serial.print("pressure notif dev%="); Serial.println(changed, 1);
 				sbaro.writeValue(pres); 
 			}
 		}else{  // not notifying

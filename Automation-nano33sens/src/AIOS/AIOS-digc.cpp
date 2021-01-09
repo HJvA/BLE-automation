@@ -1,8 +1,6 @@
 /*************
- *
+ * makes pinIO binary IO available through BLE AIOS interface
  *************/
-
-
 #include <Arduino.h>
 #include <ArduinoBLE.h>
 #include "../pinIO/pinIO.h"
@@ -13,10 +11,10 @@ time_trig_t dig_time_trig;
 
 void on_digc_written(BLEDevice central, BLECharacteristic chr){
 	//if (chr.uuid == digc.uuid){
-	Serial.print("digital received: ");
 	byte datbuf[chr.valueSize()];
 	int len = chr.readValue(datbuf, chr.valueLength());
 	pinIO::acceptBLEdig(datbuf, len);
+	Serial.print("digital received: len:");Serial.println(len);
 	for (int i=0;i<len;i++)
 		Serial.print(datbuf[i], HEX);
 	}

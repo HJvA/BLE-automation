@@ -14,14 +14,14 @@ def showChars(svr):
 	''' lists all characteristics from a service '''
 	logger.info('svr %s uuid %s' % (svr,svr.uuid))
 	for ch in svr.getCharacteristics():
-		logger.info("ch %s %s %s" % (str(ch),ch.propertiesToString(),ch.uuid))
+		logger.info("ch %s %s %s %s" % (str(ch),ch.propertiesToString(),ch.getHandle(),ch.uuid))
 		if ch.supportsRead():
 			try:
 				byts = ch.read()
 				num = int.from_bytes(byts, byteorder='little', signed=False)
-				logger.info("read %d:%s %s" % (ch.getHandle(),byts,num))
+				logger.info("read:%s => %s" % (byts,num))
 			except Exception as ex:
-				logger.info('exception reading:%s' % ex)
+				logger.info('exception reading:%s len=%d' % (ex,len(byts)))
 
 class bluepyDelegate(btle.DefaultDelegate):
 	""" handling notifications asynchronously 
@@ -85,7 +85,7 @@ class bluepyDelegate(btle.DefaultDelegate):
 		if tup:
 			if tup[0] in self.notifying:
 				chId = self.notifying[tup[0]]
-			if len(tup[1])<=4:
+			if tup[1] and len(tup[1])<=4:
 				val = int.from_bytes(tup[1], 'little') #  tls.bytes_to_int(tup[1], '<', False)
 			else:
 				val = tup[1]  # keep bytes for digitals
@@ -100,7 +100,11 @@ class bluepyDelegate(btle.DefaultDelegate):
 	def read(self, charist):
 		""" read value from characteristic on device put result also in async queue """
 		if charist.supportsRead():
-			val = charist.read()
+			try:
+				val = charist.read()
+			except btle.BTLEGattError as e:
+				logger.warning ('bluepy error on read charist :%s' % e)
+				val = None
 			if self.queue:
 				hand = charist.getHandle()
 				self.queue.put_nowait((hand,val))

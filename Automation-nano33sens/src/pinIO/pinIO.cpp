@@ -58,8 +58,6 @@ bool isReserved(byte pin) {
     if (ReservedPins[i] == pin )
       return true;
   }
-  if (pin > PIN_SERIAL_TX)  // last on nano33 ?
-    return true;
   return false;
 }
 
@@ -92,7 +90,7 @@ word mVREF[NREFS] = {  // reference voltages for analog inp
     3600,
     5000
 };
-#else 
+#else   // nano33
 //#define refADC  _AnalogReferenceMode
  _AnalogReferenceMode ADCREFMODES[NREFS] {                                                                          
   AR_INTERNAL,    // 0.6 V                                                                             
@@ -118,7 +116,7 @@ pinIO * pinIO::pins; // required to repeat it ? by cpp
 // create all bits, mapping bitidx 1:1 to pin
 void pinIO::createDigBits(byte nBits)
 {
-  Serial.print("Setting up digital IO nr:"); Serial.println(nBits, DEC); 
+  Serial.print("Setup pinIO nbits:"); Serial.println(nBits, DEC); 
   pins = new pinIO[nBits];
   for (byte iBit=0; iBit<nBits; iBit++) {
     pins[iBit].pin = (iBit); //DIGIT_TO_PIN(pin);
@@ -206,9 +204,11 @@ void anaIO::createAnaPins(byte nPins)
 	 anachans[ach].resolution = 12;
 	#else
 	 anachans[ach].reference = refADC::vVDD;  // 3.3V
-    anachans[ach].resolution = 10;
+    anachans[ach].resolution = 10;  //ADC_RESOLUTION;
 	 analogReadResolution(10);
 	#endif
+	 Serial.print("aChan:");Serial.print(ach);Serial.print(" pin:");Serial.print(anachans[ach].pin);
+	 Serial.print(" Vrng:");Serial.println(anachans[ach].maxVoltRange());
   }
   nChans=nPins;
 }
@@ -226,7 +226,7 @@ bool anaIO::setMode(byte mode) {
   if (this->mode != mode) {
    Serial.print("changing ana mode on pin ");Serial.print(pin, DEC);Serial.print(" to:"); Serial.print(mode, DEC); Serial.println(PINMODE(mode)); 
    if (isReserved(pin)) {
-     Serial.println("mode not allowed on pin !! : ");
+     Serial.println("reseved pin !!");
      return false;
    }
    switch (mode) {
