@@ -6,7 +6,7 @@
 #include <Arduino.h>
 #include <ArduinoBLE.h>
 //#include <vector>
-#include "../pinIO/pinIO.h"
+#include "src/pinIO/pinIO.h"
 #include "BLE-AIOS.h"
 
 #define anaSCALE 10000	// exponent -4 in PresentationFormatDescriptor => 10000
